@@ -1,12 +1,5 @@
 #ifndef VEHICLE_H_INCLUDED
 #define VEHICLE_H_INCLUDED
-
-//#ifdef MATHLIBRARY_EXPORTS
-//#define MATHLIBRARY_API __declspec(dllexport)
-//#else
-//#define MATHLIBRARY_API __declspec(dllimport)
-//#endif
-
 #ifdef VEHICLE_EXPORTS
 #define VEHICLE_API __declspec(dllexport)
 #else
@@ -105,23 +98,6 @@ extern "C" VEHICLE_API void Vehicle(
 // vehicle_accelerations: see "explanation_new outputs.pdf"
 // bogie_accelerations: see "explanation_new outputs.pdf"
 // bogie_yaws: see "explanation_new outputs.pdf"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #endif // VEHICLE_H_INCLUDED
 

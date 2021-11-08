@@ -5,13 +5,13 @@ import signal
 import psutil
 import gc
 
-#  i - set of parameters
-#  j - earthquake
-dirEQ  = 1    # 1 = longit. dir , 2 = transverse doir
-for i in range(1,2):
-    for j in range(1):     
-        cmd = "python .\dev\PyCoSimulation\src\orchestrator.py {case} {eq} {dir}".format(case=str(i), eq=str(j), dir=str(dirEQ))  #replace with your command
-        cmd = cmd.split()  # replace with your command
+#  i - length of set of parameters
+#  j - number of earthquakes in each set (10 earthquake intensities)
+dirEQ  = 1    # 1 = longit. dir , 2 = transverse dir
+for i in range(1,100):
+    for j in range(1,10):     
+        cmd = "python .\dev\PyCoSimulation\src\orchestrator.py {case} {eq} {dir}".format(case=str(i), eq=str(j), dir=str(dirEQ))  
+        cmd = cmd.split() 
         process = subprocess.Popen(cmd)
         pid = process.pid
         process.wait()

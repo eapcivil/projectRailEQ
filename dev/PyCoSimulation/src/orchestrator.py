@@ -416,7 +416,7 @@ class Orch(object):
 
 def multiple_analysis(argv):
     start_time = time.time()
-    eqDirection = 1  # argv[1]
+    eqDirection = argv[3]  # argv[1]
     orchPath = Path(__file__)
     srcFolderPath = orchPath.parent.absolute()
     projectPath = orchPath.parent.parent.absolute()

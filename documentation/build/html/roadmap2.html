@@ -1,0 +1,241 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Roadmap2 &#8212; GSRI_617 1.01 documentation</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="nav-item nav-item-0"><a href="index.html">GSRI_617 1.01 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Roadmap2</a><ul>
+<li><a class="reference internal" href="#main">main</a></li>
+<li><a class="reference internal" href="#bridge">bridge</a></li>
+<li><a class="reference internal" href="#vehicleapi">vehicleAPI</a></li>
+<li><a class="reference internal" href="#earthquakes">earthquakes</a></li>
+</ul>
+</li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/roadmap2.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="roadmap2">
+<h1>Roadmap2<a class="headerlink" href="#roadmap2" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="main">
+<h2>main<a class="headerlink" href="#main" title="Permalink to this headline">¶</a></h2>
+<div class="line-block">
+<div class="line">The <strong>main</strong> script executes the set of all analysis.</div>
+<div class="line">In this script only the dimension of parameters set, the direction of earthquakes,</div>
+<div class="line">and the number of earthquake intensities are defined. For each analysis the orchestrator is called to perform the solution of the coupled problem.</div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">signal</span>
+<span class="kn">import</span> <span class="nn">psutil</span>
+<span class="kn">import</span> <span class="nn">gc</span>
+
+<span class="c1">#  i - length of set of parameters</span>
+<span class="c1">#  j - number of earthquakes in each set (10 earthquake intensities)</span>
+<span class="n">dirEQ</span>  <span class="o">=</span> <span class="mi">1</span>    <span class="c1"># 1 = longit. dir , 2 = transverse dir</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">100</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+                <span class="n">cmd</span> <span class="o">=</span> <span class="s2">&quot;python .\dev\PyCoSimulation\src\orchestrator.py {case} {eq} {dir}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">case</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="n">eq</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">j</span><span class="p">),</span> <span class="nb">dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">dirEQ</span><span class="p">))</span>
+                <span class="n">cmd</span> <span class="o">=</span> <span class="n">cmd</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+                <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span>
+                <span class="n">pid</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">pid</span>
+<span class="n">process</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+<span class="n">process</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+<span class="n">outputs</span><span class="p">,</span><span class="n">errs</span><span class="o">=</span><span class="n">process</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="page-break section" id="bridge">
+<h2>bridge<a class="headerlink" href="#bridge" title="Permalink to this headline">¶</a></h2>
+<p>The <em>bridge</em> contains all the bridge related information
+E:2.programmingREDIGSRI_617projectRailEQdevPyCoSimulationsrc</p>
+</div>
+<div class="page-break section" id="vehicleapi">
+<h2>vehicleAPI<a class="headerlink" href="#vehicleapi" title="Permalink to this headline">¶</a></h2>
+<p>TThe analysis of the vehicle is performed by the <em>LMD</em> (Laboratory of Machine Dynamics A.U.Th.) solver. This is a general MBD solver, written in C++.
+A tailor-maid version of <em>LMD</em> for the analysis of a train vehicle is wrapped in a dynamic library (vehicle.dll).
+The developed  application programmers interface (API) is described in the file <em>devapi_vehicleAPI_vehicle.h</em>
+where all available inputs/outputs are explained. These arguments provided by the orchestrator at each call of the vehicle solution.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1">#ifndef VEHICLE_H_INCLUDED</span>
+<span class="c1">#define VEHICLE_H_INCLUDED</span>
+<span class="c1">#ifdef  VEHICLE_EXPORTS</span>
+<span class="c1">#define VEHICLE_API __declspec(dllexport)</span>
+<span class="c1">#else</span>
+<span class="c1">#define VEHICLE_API __declspec(dllimport)</span>
+<span class="c1">#endif</span>
+
+<span class="n">extern</span> <span class="s2">&quot;C&quot;</span> <span class="n">VEHICLE_API</span> <span class="n">void</span> <span class="n">Vehicle</span><span class="p">(</span>
+<span class="n">const</span> <span class="nb">bool</span> <span class="n">cosim_converge</span><span class="p">,</span> <span class="n">const</span> <span class="nb">bool</span> <span class="n">is_first_time</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="n">t0</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="n">t1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="n">nintervals</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="n">tol_in</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="n">tol_out</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="n">tol_dphi</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="n">tol_phi</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="n">nn</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="n">krr_explicit</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="n">crr_explicit</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">char</span><span class="o">*</span> <span class="n">xml0_path</span><span class="p">,</span> <span class="n">const</span> <span class="n">char</span><span class="o">*</span> <span class="n">xml1_path</span><span class="p">,</span> <span class="n">const</span> <span class="n">char</span><span class="o">*</span> <span class="n">xml2_path</span><span class="p">,</span>
+<span class="n">const</span> <span class="nb">int</span> <span class="n">npoints</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="n">vx</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">x_p_l_n</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">y_p_l_n</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">z_p_l_n</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">x_p_l_n1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">y_p_l_n1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">z_p_l_n1</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">x_p_r_n</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">y_p_r_n</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">z_p_r_n</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">x_p_r_n1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">y_p_r_n1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">z_p_r_n1</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">x_v_l_n</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">y_v_l_n</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">z_v_l_n</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">x_v_l_n1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">y_v_l_n1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">z_v_l_n1</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">x_v_r_n</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">y_v_r_n</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">z_v_r_n</span><span class="p">,</span>
+<span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">x_v_r_n1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">y_v_r_n1</span><span class="p">,</span> <span class="n">const</span> <span class="n">double</span> <span class="o">*</span><span class="n">z_v_r_n1</span><span class="p">,</span>
+<span class="n">double</span> <span class="o">*</span><span class="n">cp_positions</span><span class="p">,</span> <span class="n">double</span> <span class="o">*</span><span class="n">cp_velocities</span><span class="p">,</span> <span class="n">double</span> <span class="o">*</span><span class="n">cp_forces</span><span class="p">,</span>
+<span class="n">double</span> <span class="o">*</span><span class="n">vehicle_accelerations</span><span class="p">,</span> <span class="n">double</span> <span class="o">*</span><span class="n">bogie_accelerations</span><span class="p">,</span>
+<span class="n">double</span> <span class="o">*</span><span class="n">bogie_yaws</span><span class="p">);</span>
+
+<span class="o">//</span> <span class="n">cosim_converge</span> <span class="p">:</span> <span class="n">cosimulation</span> <span class="n">converge</span>
+<span class="o">//</span> <span class="n">is_first_time</span> <span class="p">:</span> <span class="ow">is</span> <span class="n">the</span> <span class="n">first</span> <span class="n">you</span> <span class="n">are</span> <span class="n">calling</span> <span class="n">vehicle</span>
+<span class="o">//</span> <span class="n">t0</span> <span class="p">:</span> <span class="n">previous</span> <span class="n">cosimulation</span> <span class="n">time</span>
+<span class="o">//</span> <span class="n">t1</span> <span class="p">:</span> <span class="n">current</span>  <span class="n">cosimulation</span> <span class="n">time</span>
+<span class="o">//</span> <span class="n">nintervals</span> <span class="p">:</span> <span class="n">number</span> <span class="n">of</span> <span class="n">intervals</span> <span class="k">for</span> <span class="n">vehicle</span> <span class="n">solution</span><span class="p">,</span> <span class="n">thus</span> <span class="n">time</span><span class="o">-</span><span class="n">step</span> <span class="o">=</span> <span class="p">(</span><span class="n">t1</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span><span class="o">/</span><span class="n">nintervals</span>
+<span class="o">//</span> <span class="n">tol_in</span> <span class="p">:</span> <span class="n">velocity</span> <span class="n">tolerance</span> <span class="p">(</span><span class="mf">1e-3</span> <span class="ow">or</span> <span class="n">lower</span><span class="p">)</span>
+<span class="o">//</span> <span class="n">tol_out</span> <span class="p">:</span> <span class="n">residual</span> <span class="n">tolerance</span> <span class="p">(</span><span class="mf">1e-2</span> <span class="ow">or</span> <span class="n">lower</span><span class="p">),</span> <span class="n">must</span> <span class="n">be</span> <span class="n">tol_in</span> <span class="o">&lt;</span> <span class="n">tol_out</span>
+<span class="o">//</span> <span class="n">tol_dphi</span> <span class="p">:</span> <span class="n">tolerance</span> <span class="k">for</span> <span class="n">dphi_dt</span> <span class="p">(</span><span class="mf">1e-3</span> <span class="ow">or</span> <span class="n">lower</span><span class="p">)</span>
+<span class="o">//</span> <span class="n">tol_phi</span> <span class="p">:</span> <span class="n">tolerance</span> <span class="k">for</span> <span class="n">phi</span> <span class="p">(</span><span class="mf">1e-2</span> <span class="ow">or</span> <span class="n">lower</span><span class="p">)</span>
+
+<span class="o">//</span> <span class="n">nn</span><span class="p">:</span>
+<span class="o">//</span>  <span class="k">if</span> <span class="n">nn</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="n">then</span> <span class="n">krrs</span> <span class="o">=</span> <span class="p">(</span> <span class="mf">2.0</span><span class="o">*</span><span class="n">PI</span><span class="o">/</span><span class="p">(</span><span class="n">nn</span> <span class="o">*</span> <span class="n">h</span><span class="p">)</span> <span class="p">)</span><span class="o">^</span><span class="mi">2</span> <span class="o">*</span> <span class="n">mrrs</span><span class="p">,</span> <span class="n">crrs</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">krrs</span> <span class="o">*</span> <span class="n">mrrs</span><span class="p">);</span>
+<span class="o">//</span>  <span class="k">if</span> <span class="n">nn</span> <span class="o">==</span> <span class="mf">0.0</span> <span class="ow">or</span> <span class="n">something</span> <span class="n">very</span> <span class="n">small</span> <span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">g</span><span class="o">.</span> <span class="mf">1e-10</span><span class="p">)</span> <span class="n">then</span> <span class="n">krrs</span> <span class="o">=</span> <span class="n">crrs</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="o">//</span>  <span class="k">if</span> <span class="n">nn</span> <span class="o">&lt;</span> <span class="mf">0.0</span> <span class="n">then</span> <span class="n">krrs</span> <span class="o">=</span> <span class="n">krr_explicit</span><span class="p">,</span> <span class="n">crrs</span> <span class="o">=</span> <span class="n">crr_explicit</span>
+
+<span class="o">//</span> <span class="n">xml1_path</span> <span class="p">:</span> <span class="n">path</span> <span class="k">for</span> <span class="n">xml1</span><span class="p">,</span> <span class="n">THIS</span> <span class="n">IS</span> <span class="n">ALWAYS</span> <span class="n">THE</span> <span class="n">INPUT</span> <span class="n">FOR</span> <span class="n">THE</span> <span class="n">DLL</span> <span class="n">TO</span> <span class="n">SOLVE</span>
+<span class="o">//</span> <span class="n">xml0_path</span> <span class="p">:</span> <span class="n">path</span> <span class="k">for</span> <span class="n">xml0</span><span class="p">,</span> <span class="n">used</span> <span class="k">as</span> <span class="nb">input</span> <span class="p">(</span><span class="n">copying</span> <span class="n">it</span> <span class="n">to</span> <span class="n">xml1</span><span class="p">)</span> <span class="n">only</span> <span class="n">when</span> <span class="n">is_first_time</span> <span class="o">=</span> <span class="n">true</span>
+<span class="o">//</span> <span class="n">xml1_path</span> <span class="p">:</span> <span class="n">path</span> <span class="k">for</span> <span class="n">xml1</span><span class="p">,</span> <span class="n">used</span> <span class="k">as</span> <span class="nb">input</span> <span class="n">when</span> <span class="n">is_first_time</span> <span class="o">=</span> <span class="n">false</span><span class="p">,</span> <span class="n">this</span> <span class="n">means</span> <span class="n">that</span> <span class="n">at</span> <span class="n">least</span>
+<span class="o">//</span>             <span class="n">one</span> <span class="n">cosim_converge</span> <span class="n">has</span> <span class="n">occured</span>
+<span class="o">//</span> <span class="n">xml2_path</span> <span class="p">:</span> <span class="n">path</span> <span class="k">for</span> <span class="n">xml2</span><span class="p">,</span> <span class="n">used</span> <span class="n">to</span> <span class="n">keep</span> <span class="n">the</span> <span class="n">results</span> <span class="kn">from</span> <span class="nn">the</span> <span class="nn">xml1_run</span> <span class="nn">in</span> <span class="nn">case</span> <span class="nn">there</span> <span class="nn">is</span> <span class="nn">cosim_converge</span>
+
+<span class="o">//</span> <span class="n">npoints</span> <span class="p">:</span> <span class="n">number</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span> <span class="k">for</span> <span class="n">the</span> <span class="n">position</span><span class="o">-</span><span class="n">velocity</span> <span class="n">splines</span>
+<span class="o">//</span> <span class="n">vx</span> <span class="p">:</span> <span class="n">the</span> <span class="n">constant</span> <span class="n">forward</span> <span class="n">velocity</span> <span class="n">of</span> <span class="n">the</span> <span class="n">front</span> <span class="n">vehicle</span>
+
+<span class="o">//</span> <span class="n">x_p_l_n</span>  <span class="p">:</span> <span class="n">x</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">y_p_l_n</span>  <span class="p">:</span> <span class="n">y</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">z_p_l_n</span>  <span class="p">:</span> <span class="n">z</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">x_p_l_n1</span> <span class="p">:</span> <span class="n">x</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="o">//</span> <span class="n">y_p_l_n1</span> <span class="p">:</span> <span class="n">y</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="o">//</span> <span class="n">z_p_l_n1</span> <span class="p">:</span> <span class="n">z</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+
+<span class="o">//</span> <span class="n">x_p_r_n</span>  <span class="p">:</span> <span class="n">x</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">y_p_r_n</span>  <span class="p">:</span> <span class="n">y</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">z_p_r_n</span>  <span class="p">:</span> <span class="n">z</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">x_p_r_n1</span> <span class="p">:</span> <span class="n">x</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="o">//</span> <span class="n">y_p_r_n1</span> <span class="p">:</span> <span class="n">y</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="o">//</span> <span class="n">z_p_r_n1</span> <span class="p">:</span> <span class="n">z</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">position</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+
+<span class="o">//</span> <span class="n">x_v_l_n</span>  <span class="p">:</span> <span class="n">x</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">y_v_l_n</span>  <span class="p">:</span> <span class="n">y</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">z_v_l_n</span>  <span class="p">:</span> <span class="n">z</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">x_v_l_n1</span> <span class="p">:</span> <span class="n">x</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="o">//</span> <span class="n">y_v_l_n1</span> <span class="p">:</span> <span class="n">y</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="o">//</span> <span class="n">z_v_l_n1</span> <span class="p">:</span> <span class="n">z</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">left</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+
+<span class="o">//</span> <span class="n">x_v_r_n</span>  <span class="p">:</span> <span class="n">x</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">y_v_r_n</span>  <span class="p">:</span> <span class="n">y</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">z_v_r_n</span>  <span class="p">:</span> <span class="n">z</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span>
+<span class="o">//</span> <span class="n">x_v_r_n1</span> <span class="p">:</span> <span class="n">x</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="o">//</span> <span class="n">y_v_r_n1</span> <span class="p">:</span> <span class="n">y</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="o">//</span> <span class="n">z_v_r_n1</span> <span class="p">:</span> <span class="n">z</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">interpolation</span> <span class="n">points</span><span class="p">,</span> <span class="k">for</span> <span class="n">velocity</span> <span class="n">spline</span><span class="p">,</span> <span class="n">right</span> <span class="n">rail</span><span class="p">,</span> <span class="n">spline</span> <span class="n">at</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span>
+
+<span class="o">//</span> <span class="n">cp_positions</span> <span class="p">:</span> <span class="n">xyz</span> <span class="n">coords</span> <span class="n">of</span> <span class="n">the</span> <span class="n">contact</span> <span class="n">points</span> <span class="p">(</span><span class="n">cp</span> <span class="n">one</span> <span class="n">per</span> <span class="n">wheel</span><span class="p">,</span> <span class="n">thus</span> <span class="n">two</span> <span class="n">per</span> <span class="n">wheelset</span><span class="p">)</span>
+        <span class="o">//</span> <span class="n">example</span> <span class="k">for</span> <span class="n">two</span> <span class="n">wheelsets</span><span class="p">:</span> <span class="n">cp_positions</span> <span class="o">=</span> <span class="p">{</span> <span class="n">x_first_wheelset_left_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">y_first_wheelset_left_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">z_first_wheelset_left_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">x_first_wheelset_right_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">y_first_wheelset_right_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">z_first_wheelset_right_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">x_second_wheelset_left_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">y_second_wheelset_left_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">z_second_wheelset_left_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">x_second_wheelset_right_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">y_second_wheelset_right_wheel</span><span class="p">,</span>
+        <span class="o">//</span>                                             <span class="n">z_second_wheelset_right_wheel</span> <span class="p">}</span>
+<span class="o">//</span> <span class="n">cp_velocities</span> <span class="p">:</span> <span class="n">xyz</span> <span class="n">velocity</span> <span class="n">components</span> <span class="n">of</span> <span class="n">the</span> <span class="n">contact</span> <span class="n">points</span>
+        <span class="o">//</span> <span class="n">example</span> <span class="k">for</span> <span class="n">two</span> <span class="n">wheelsets</span><span class="p">:</span> <span class="n">cp_velocities</span> <span class="o">=</span> <span class="s2">&quot;see cp_positions&quot;</span>
+<span class="o">//</span> <span class="n">cp_forces</span> <span class="p">:</span> <span class="n">xyz</span> <span class="n">force</span> <span class="n">components</span> <span class="n">at</span> <span class="n">the</span> <span class="n">contact</span> <span class="n">points</span>
+        <span class="o">//</span> <span class="n">example</span> <span class="k">for</span> <span class="n">two</span> <span class="n">wheelsets</span><span class="p">:</span> <span class="n">cp_forces</span> <span class="o">=</span> <span class="s2">&quot;see cp_positions&quot;</span>
+<span class="o">//</span> <span class="n">vehicle_accelerations</span><span class="p">:</span> <span class="n">see</span> <span class="s2">&quot;explanation_new outputs.pdf&quot;</span>
+<span class="o">//</span> <span class="n">bogie_accelerations</span><span class="p">:</span> <span class="n">see</span> <span class="s2">&quot;explanation_new outputs.pdf&quot;</span>
+<span class="o">//</span> <span class="n">bogie_yaws</span><span class="p">:</span> <span class="n">see</span> <span class="s2">&quot;explanation_new outputs.pdf&quot;</span>
+
+<span class="c1">#endif // VEHICLE_H_INCLUDED</span>
+</pre></div>
+</div>
+</div>
+<div class="page-break section" id="earthquakes">
+<h2>earthquakes<a class="headerlink" href="#earthquakes" title="Permalink to this headline">¶</a></h2>
+<div class="line-block">
+<div class="line">Folder <strong>devPyCoSimulationearthquakes</strong> contains the selected accelograms.</div>
+<div class="line">Each subfolder, e.g <strong>earthquakes5</strong> contains ten(10) accelerograms with gradual intensity(0.1 - 1.0 g)</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="nav-item nav-item-0"><a href="index.html">GSRI_617 1.01 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2021, RAIL-EQ.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
+    </div>
+  </body>
+</html>

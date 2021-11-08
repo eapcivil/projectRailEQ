@@ -42,7 +42,7 @@ class Bridge(object):
                            45, 18, 19, 3, 20, 21, 46, 47, 48, 49, 50, 51, 52, 53, 54, 22, 23, 4, 24, 25, 55, 56, 57, 58,
                            59, 60, 61,
                            62, 63, 26, 5]
-        self.controlPoints = [1, 28, 31, 34, 14, 2, 17, 40, 42, 18, 3, 21, 49, 51, 22, 4, 25, 57, 60, 63, 5]                  # control points of spline output to vehicle solver
+        self.controlPoints = [1, 28, 31, 34, 14, 2, 17, 40, 42, 18, 3, 21, 49, 51, 22, 4, 25, 57, 60, 63, 5] 
         self.pier_top_nodes = [6, 7, 8]
         self.pier_base_nodes = [9, 10, 11]
         self.bearing_top_nodes = [136, 138, 140, 142, 144, 146, 148, 150, 152, 154]
@@ -1522,4 +1522,4 @@ class Bridge(object):
 
 
 if __name__ == '__main__':
-    test_Bridge()
+    pass

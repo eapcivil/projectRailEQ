@@ -1,0 +1,218 @@
+Roadmap
+=======
+overview
+--------
+Coupled simulation or co-simulation has been proposed to overcome the challenges emerging in complex, coupled engineering systems. The holistic problem is being broken down into two or more individual subsystems, and the coupling variables between the subsystems could be either in force terms (applied-force coupling), or in force-kinematic terms (displacement-displacement (X-X) and displacement-force (X-T) respectively). A third simulator, named orchestrator, carries out the co-simulation process responsible for the integration, coupling, and communication between subsystems. The orchestrator leads each co-simulation step (communication interval), exchanges variables with the subsystems simulators, and checks the coupling conditions (convergence). In the co-simulation method, each subsystem has its integration step, a fraction of the communication interval. It is outlined that the orchestrator is only aware of the interface variables going in and out of the individual simulators; thus, the subsystems are black-box mock-ups to the orchestrator. 
+The input parameters for the vehicle subsystem are the position and velocities of the rails, and the output parameters are the contact forces (direction, magnitude, location) at the wheel-rail interface. Regarding the bridge subsystem, the input parameters are the contact forces (direction, magnitude, location), and the output parameters are the position and velocities of the rails. The orchestrator sends input and receives output parameters to and from the subsystems. It also defines the solution sequence, checks if convergence is achieved, and updates the system state. It is outlined that the rail is described as a piecewise cubic spline with a predefined set of control points selected by the user and does not necessarily coincide with nodal points of the structural mesh. The coordinates and velocities of these points are time-dependent and computed from the displacements and velocities of the bridge finite element model. Therefore a time-dependent expression of the position and velocity of the rail is obtained.
+Regarding the communication scheme, the Gauss-Seidel (serial) communication scheme is proposed to solve the vehicle(train)-bridge system in the time domain. The bridge subdomain is first solved at each iteration for the communication interval H (starting point T :subscript:`N`), taking the contact forces (time-dependent) as input from the vehicle subdomain and the selected ground motion. The output parameters after analysis are the position and velocity of the rail. The vehicle subdomain is subsequently solved for the same time interval, receiving the rails' updated state (time dependent) as input. The output parameters after analysis are the contact forces, i.e. their magnitude, direction, and location. The orchestrator utilizes the results of the subdomain analyses, checks the convergence criteria. The process described is repeated until they are satisfied (convergence). Then, the co-simulation can proceed to the next communication point. To summarize, the main steps for each communication interval are the following:
+	
+	* Solution of the bridge subsystem from T :subscript:`N`  to H+T :subscript:`N`, taking the ground motion and the vehicle forces as input. The state of the system is stored, and the state of the rail (position and velocities) is returned to the orchestrator.
+	* Solution of the vehicle subsystem from T :subscript:`N` to H+T :subscript:`N`, taking the state of the rail as input. The state of the system is stored, and the forces (position, direction, magnitude) at the contact points of the wheelset and the rail are returned to the orchestrator.
+	* Convergence check. If the selected criteria are satisfied then the sub systems are updated and are initialized to begin the next cosimulation step. If convergence is not obtained, then the systems are reset and iterations are continued.
+	
+It should be outlined that the vehicle subdomain is solved using a multibody dynamics method developed at the Laboratory of Machine Dynamics (AUTh. The bridge subdomain is solved via Opensees, a general FEM open-source code. The coupled vehicle-bridge systems’ analysis procedure is described in the following figures, explaining the analysis of every subsystem at every distinct step and the communication pattern. 
+
+	
+
+.. image:: fig4.png
+  :width: 800
+
+
+.. image:: fig2.png
+  :width: 800
+
+  
+.. image:: fig3.png
+  :width: 800
+
+
+main
+------------
+
+The **main** script executes the set of all analyses. In this script, only the dimension of parameters set, the direction of earthquakes, 
+and the number of earthquake intensities is defined. For each analysis, the orchestrator is called to perform the solution of the coupled problem.
+
+.. literalinclude:: ../../dev\main.py
+   :language: python
+   :lines: 1-20
+   :caption: **main**
+   :name: main-
+
+For each line on the file *dev\\PyCoSimulation\\src\\Parameters.txt*  the system is solved for all selected accelerograms.
+The selected erthquakes are included in subfolders in *dev\\PyCoSimulation\\earthquakes*. 
+Each folder, e.g *\\earthquakes\\5* ten(10) accelerograms included with gradual intensity(0.1 - 1.0 g).
+The orchestrator reads each accelerogram. Afterward, it sends the accelerogram as an argument to the bridge submodel.
+Finally, a selected irregularity is applied for the rails. This is included in the file *dev\\PyCoSimulation\\src\\Parameters.txt*. The orchestrator reads the irregularity, and it is sent to the vehicle subsystem.
+
+
+
+orchestrator
+------------
+The *orchestrator* class contains all the necessary parameters for the cosimulation analysis of the coupled VBI problem. The *orchestrator* manages the solution process. In the current implementation, a *Gauss-Seidel* communication scheme is adopted, i.e., that the two subsystems are solved sequentially. This class organizes the information at the interface of the coupled problem. A "Force-Displacement" coupling method is implemented. Specifically, the *orchestrator* receives from the bride subsystems the state of the rails(displacements, velocities) and sends to this subsystem the position  
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\orchestrator.py
+   :language: python
+   :lines: 15,16,56,62,68,417
+   :caption: **class Orch**
+   :name: class-Orch-
+   
+The function *multiple analysis* sets and executes the analyses. It is called from *main*, constructs and solves each analysis.
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\orchestrator.py
+   :language: python
+   :lines: 417-517
+   :caption: **multiple analysis**
+   :name: multiple-analysis   
+ 
+Also some basic data are defined in this point of the code
+
+==================  ==============================================================================================  
+  Property                          Discription    
+==================  ============================================================================================== 
+numberofCarbodies   The number of carbodies of the train
+vehicleLength		The length of the vehicle = (Length of each car)*(numberofCarbodies)
+spline_extension    The extension of the spline outside of the bridge. This applies to each side of the bridge
+bridgeLength        The total length of the bridge structure
+vehicleSpeed        The speed of the train in [m/sec]
+==================  ============================================================================================== 
+   
+The function *__init__* initialize the basic parameters of the cosimulation. It receives these parameters from the *multiple analysis*.
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\orchestrator.py
+   :language: python
+   :lines: 16-55
+   :caption: **__init__**
+   :name: -init-Orch
+
+The function *time*  sets the timesteps for each subsystem and the communication interval.
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\orchestrator.py
+   :language: python
+   :lines: 56-60
+   :caption: **time**
+   :name: -time-Orch  
+
+==================  =======================================================================================  
+Property            Description    
+==================  ======================================================================================= 
+globalTime          Set the global time at the beginning of the problem
+dtCosim		        Set the cosimulation step H
+dtBridge            Set the time step for the analysis of the bridge structure
+dtBoogie            Set the time step for the analysis of the vehicle
+==================  ======================================================================================= 
+
+
+The function *solution* runs the communication analysis. Sends and receives the input/output of each subsystem, checks convergence conditions at the interfaces, and restores or updates (convergence) the systems states. Furthermore, it saves to specific structures selected results for post process.
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\orchestrator.py
+   :language: python
+   :lines: 68-414
+   :caption: **solution**
+   :name: -solution-Orch
+   
+The function *update*  updates the subsystems states and 
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\orchestrator.py
+   :language: python
+   :lines: 62-66
+   :caption: **update**
+   :name: -update-Orch  
+
+
+.. rst-class:: page-break
+
+
+bridge
+------------
+The *bridge* contains all the bridge-related information. The class bridge contains the following properties.
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\Bridge.py
+   :language: python
+   :lines: 37,38,39,40,70,84,1105,1120,1158,1255,1466,1469
+   :caption: **class Bridge**
+   :name: class-Bridge-
+   
+The function *__init__* initialize the basic parameters of the bridge model. It receives these parameters from the *orchestrator*. 
+Also, in this function, some important node sets are defined.
+
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\Bridge.py
+   :language: python
+   :lines: 39,40,41,42,43,44,45,46,47,48,49,50
+   :caption: **__init__**
+   :name: -init-
+
+These sets contain the necessary information for communication with the orchestrator and the post-process operations.
+
+==================  =======================================================================================  
+  SetName                          Information    
+==================  ======================================================================================= 
+deckNodeID          Includes the ID's of nodes at the deck
+pier_top_nodes		Includes the ID's of nodes at piers top
+pier_base_nodes     Includes the ID's of nodes at piers base
+bearing_top_nodes   Includes the ID's of nodes at bearings top
+bearing_base_nodes	Includes the ID's of nodes at bearings base
+abtX_nodes			Includes the ID's of nodes at bearings base
+abtY_nodes			Includes the ID's of nodes at bearings base
+controlPoints       Includes the ID's of nodes that used for the construction of rails reference spline 
+==================  ======================================================================================= 
+
+In the function *construct_model*, the specific parametrized bridge model is defined.
+The function *initialize_model* creates the basic properties of an OpenSees model, i.e., dimension of the problem, number of degrees of freedom at each mesh node, sets the global time, and creates the database folder.
+The functions *solve_gravity* and *solve_transient* run the current model for static and dynamic loading.
+The subsystems of the formulation retain two states, the previously converged and the current trial state. 
+The function *restore* resets the current trial structure state (displacements, velocity, internal parameters) to the previously converged state. 
+The function *update* sets the converged state to the current trial structure state.
+
+
+
+.. rst-class:: page-break
+
+
+vehicle
+------------
+The analysis of the vehicle is performed by the *LMD* (Laboratory of Machine Dynamics A.U.Th.) solver. *LMD* is a general MBD solver written in C++.
+A tailor-maid version of *LMD* for the analysis of a train vehicle is wrapped in a dynamic library (vehicle.dll).
+The developed  application programmers interface (API) is described in the file *dev\\api_vehicle\\API_vehicle.h*
+where all available inputs/outputs are explained. These arguments are provided by the *orchestrator* at each call of the vehicle solution.
+
+
+.. literalinclude:: ../../dev\api_vehicle\API_vehicle.h
+   :language: cpp
+   :caption: **vehicleAPI**
+   :name: vehicleAPI-
+    
+
+The XML file, which contains the vehicle system's definition, is located at the folder *dev\\api_vehicle\\vehicle_xmls*. The file *veh_0.xml* should be provided for analysis. The XML file format is in line with the input of commercial software "MotionSolve".  The included file refers to a 5-car train with the following properties. The selected properties are summarized in Table (**Units  [kgr, N, m, sec]**).
+
+===============================   ==========  ==================================  ========  ================================   ======  
+Mass   Properties																	                                                   
+-------------------------------------------------------------------------------------------------------------------------------------  
+===============================   ==========  ==================================  ========  ================================   ======  
+Carbody mass                      41750	      Bogie mass                          3040      Wheelset mass                      1780    
+Carbody roll moment of inertia	  23200	      Bogie roll moment of inertia        1580      Wheelset roll moment of inertia    1140    
+Carbody yaw moment of inertia	  2100000     Bogie yaw moment of inertia         2340      Wheelset yaw moment of inertia     1140    
+Carbody pitch moment of inertia	  2080000     Bogie pitch moment of inertia       3920      Wheelset pitch moment of inertia   154     
+===============================   ==========  ==================================  ========  ================================   ======  
+
+| 
+| 
+
+====================    ========    =====================    ==========
+Stiffness   Properties              Damping   Properties
+--------------------------------    ----------------------------------- 
+====================    ========    =====================    ==========
+Primary vertical        950000      Primary vertical         950000
+Primary lateral         20000       Primary lateral          20000
+Secondary  vertical     350000      Secondary  vertical      350000
+Secondary  lateral      210000      Secondary  lateral       210000
+====================    ========    =====================    ==========
+
+The vehicle dll file is called through *Vehicle_dll.py*. The main class is the *FixedVehicleDll* and is called from the orchestrator. The orchestrator pass all the relevant data that are required as described in *vehicleAPI*
+
+.. literalinclude:: ../../dev\PyCoSimulation\src\Vehicle_dll.py
+   :language: python
+   :lines: 31,33,142
+   :caption: **vehicle_dll**
+   :name: vehicle-dll
+

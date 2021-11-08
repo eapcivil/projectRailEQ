@@ -1,0 +1,1008 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Roadmap &#8212; RAIL-EQ (GRANT GSRI_617) 1.01 documentation</title>
+    <link rel="stylesheet" href="_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="General" href="general.html" /> 
+  </head><body>
+      <div class="header" role="banner"><h1 class="heading"><a href="index.html">
+          <span>RAIL-EQ (GRANT GSRI_617) 1.01 documentation</span></a></h1>
+        <h2 class="heading"><span>Roadmap</span></h2>
+      </div>
+      <div class="topnav" role="navigation" aria-label="top navigation">
+      
+        <p>
+        «&#160;&#160;<a href="general.html">General</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="index.html">Contents</a>
+        </p>
+
+      </div>
+      <div class="content" role="main">
+        
+        
+  <div class="section" id="roadmap">
+<h1>Roadmap<a class="headerlink" href="#roadmap" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>Coupled simulation or co-simulation has been proposed to overcome the challenges emerging in complex, coupled engineering systems. The holistic problem is being broken down into two or more individual subsystems, and the coupling variables between the subsystems could be either in force terms (applied-force coupling), or in force-kinematic terms (displacement-displacement (X-X) and displacement-force (X-T) respectively). A third simulator, named orchestrator, carries out the co-simulation process responsible for the integration, coupling, and communication between subsystems. The orchestrator leads each co-simulation step (communication interval), exchanges variables with the subsystems simulators, and checks the coupling conditions (convergence). In the co-simulation method, each subsystem has its integration step, a fraction of the communication interval. It is outlined that the orchestrator is only aware of the interface variables going in and out of the individual simulators; thus, the subsystems are black-box mock-ups to the orchestrator.
+The input parameters for the vehicle subsystem are the position and velocities of the rails, and the output parameters are the contact forces (direction, magnitude, location) at the wheel-rail interface. Regarding the bridge subsystem, the input parameters are the contact forces (direction, magnitude, location), and the output parameters are the position and velocities of the rails. The orchestrator sends input and receives output parameters to and from the subsystems. It also defines the solution sequence, checks if convergence is achieved, and updates the system state. It is outlined that the rail is described as a piecewise cubic spline with a predefined set of control points selected by the user and does not necessarily coincide with nodal points of the structural mesh. The coordinates and velocities of these points are time-dependent and computed from the displacements and velocities of the bridge finite element model. Therefore a time-dependent expression of the position and velocity of the rail is obtained.
+Regarding the communication scheme, the Gauss-Seidel (serial) communication scheme is proposed to solve the vehicle(train)-bridge system in the time domain. The bridge subdomain is first solved at each iteration for the communication interval H (starting point T <sub>N</sub>), taking the contact forces (time-dependent) as input from the vehicle subdomain and the selected ground motion. The output parameters after analysis are the position and velocity of the rail. The vehicle subdomain is subsequently solved for the same time interval, receiving the rails’ updated state (time dependent) as input. The output parameters after analysis are the contact forces, i.e. their magnitude, direction, and location. The orchestrator utilizes the results of the subdomain analyses, checks the convergence criteria. The process described is repeated until they are satisfied (convergence). Then, the co-simulation can proceed to the next communication point. To summarize, the main steps for each communication interval are the following:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Solution of the bridge subsystem from T <sub>N</sub>  to H+T <sub>N</sub>, taking the ground motion and the vehicle forces as input. The state of the system is stored, and the state of the rail (position and velocities) is returned to the orchestrator.</p></li>
+<li><p>Solution of the vehicle subsystem from T <sub>N</sub> to H+T <sub>N</sub>, taking the state of the rail as input. The state of the system is stored, and the forces (position, direction, magnitude) at the contact points of the wheelset and the rail are returned to the orchestrator.</p></li>
+<li><p>Convergence check. If the selected criteria are satisfied then the sub systems are updated and are initialized to begin the next cosimulation step. If convergence is not obtained, then the systems are reset and iterations are continued.</p></li>
+</ul>
+</div></blockquote>
+<p>It should be outlined that the vehicle subdomain is solved using a multibody dynamics method developed at the Laboratory of Machine Dynamics (AUTh. The bridge subdomain is solved via Opensees, a general FEM open-source code. The coupled vehicle-bridge systems’ analysis procedure is described in the following figures, explaining the analysis of every subsystem at every distinct step and the communication pattern.</p>
+<a class="reference internal image-reference" href="_images/fig4.png"><img alt="_images/fig4.png" src="_images/fig4.png" style="width: 800px;" /></a>
+<a class="reference internal image-reference" href="_images/fig2.png"><img alt="_images/fig2.png" src="_images/fig2.png" style="width: 800px;" /></a>
+<a class="reference internal image-reference" href="_images/fig3.png"><img alt="_images/fig3.png" src="_images/fig3.png" style="width: 800px;" /></a>
+</div>
+<div class="section" id="main">
+<h2>main<a class="headerlink" href="#main" title="Permalink to this headline">¶</a></h2>
+<p>The <strong>main</strong> script executes the set of all analyses. In this script, only the dimension of parameters set, the direction of earthquakes,
+and the number of earthquake intensities is defined. For each analysis, the orchestrator is called to perform the solution of the coupled problem.</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><strong>main</strong></span><a class="headerlink" href="#id1" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">signal</span>
+<span class="kn">import</span> <span class="nn">psutil</span>
+<span class="kn">import</span> <span class="nn">gc</span>
+
+<span class="c1">#  i - length of set of parameters</span>
+<span class="c1">#  j - number of earthquakes in each set (10 earthquake intensities)</span>
+<span class="n">dirEQ</span>  <span class="o">=</span> <span class="mi">1</span>    <span class="c1"># 1 = longit. dir , 2 = transverse dir</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">100</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">10</span><span class="p">):</span>     
+        <span class="n">cmd</span> <span class="o">=</span> <span class="s2">&quot;python .\dev\PyCoSimulation\src\orchestrator.py {case} {eq} {dir}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">case</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="n">eq</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">j</span><span class="p">),</span> <span class="nb">dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">dirEQ</span><span class="p">))</span>  
+        <span class="n">cmd</span> <span class="o">=</span> <span class="n">cmd</span><span class="o">.</span><span class="n">split</span><span class="p">()</span> 
+        <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span>
+        <span class="n">pid</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">pid</span>
+        <span class="n">process</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+        <span class="n">process</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+        <span class="n">outputs</span><span class="p">,</span><span class="n">errs</span><span class="o">=</span><span class="n">process</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+
+</pre></div>
+</div>
+</div>
+<p>For each line on the file <em>dev\PyCoSimulation\src\Parameters.txt</em>  the system is solved for all selected accelerograms.
+The selected erthquakes are included in subfolders in <em>dev\PyCoSimulation\earthquakes</em>.
+Each folder, e.g <em>\earthquakes\5</em> ten(10) accelerograms included with gradual intensity(0.1 - 1.0 g).
+The orchestrator reads each accelerogram. Afterward, it sends the accelerogram as an argument to the bridge submodel.
+Finally, a selected irregularity is applied for the rails. This is included in the file <em>dev\PyCoSimulation\src\Parameters.txt</em>. The orchestrator reads the irregularity, and it is sent to the vehicle subsystem.</p>
+</div>
+<div class="section" id="orchestrator">
+<h2>orchestrator<a class="headerlink" href="#orchestrator" title="Permalink to this headline">¶</a></h2>
+<p>The <em>orchestrator</em> class contains all the necessary parameters for the cosimulation analysis of the coupled VBI problem. The <em>orchestrator</em> manages the solution process. In the current implementation, a <em>Gauss-Seidel</em> communication scheme is adopted, i.e., that the two subsystems are solved sequentially. This class organizes the information at the interface of the coupled problem. A “Force-Displacement” coupling method is implemented. Specifically, the <em>orchestrator</em> receives from the bride subsystems the state of the rails(displacements, velocities) and sends to this subsystem the position</p>
+<div class="literal-block-wrapper docutils container" id="class-orch">
+<div class="code-block-caption"><span class="caption-text"><strong>class Orch</strong></span><a class="headerlink" href="#class-orch" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">Orch</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dllDir</span><span class="p">,</span> <span class="n">xmlDir</span><span class="p">,</span><span class="n">spline_extension</span><span class="p">,</span> <span class="n">CosimSteps</span><span class="p">,</span> <span class="n">bridgeLenght</span><span class="p">,</span> <span class="n">eqTime</span><span class="p">,</span> <span class="n">eqValues</span><span class="p">,</span> <span class="n">irregularityX</span><span class="p">,</span>
+    <span class="k">def</span> <span class="nf">time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bridge</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">solution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">multiple_analysis</span><span class="p">(</span><span class="n">argv</span><span class="p">):</span>
+</pre></div>
+</div>
+</div>
+<p>The function <em>multiple analysis</em> sets and executes the analyses. It is called from <em>main</em>, constructs and solves each analysis.</p>
+<div class="literal-block-wrapper docutils container" id="multiple-analysis">
+<div class="code-block-caption"><span class="caption-text"><strong>multiple analysis</strong></span><a class="headerlink" href="#multiple-analysis" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">multiple_analysis</span><span class="p">(</span><span class="n">argv</span><span class="p">):</span>
+    <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">eqDirection</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>  <span class="c1"># argv[1]</span>
+    <span class="n">orchPath</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="n">srcFolderPath</span> <span class="o">=</span> <span class="n">orchPath</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+    <span class="n">projectPath</span> <span class="o">=</span> <span class="n">orchPath</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+    <span class="n">PyCosimPath</span> <span class="o">=</span> <span class="n">srcFolderPath</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+    <span class="n">ApiPath</span><span class="o">=</span><span class="n">orchPath</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span>
+    <span class="n">eqPath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">projectPath</span><span class="p">,</span> <span class="s2">&quot;Earthquakes&quot;</span><span class="p">)</span>
+    <span class="n">dllDir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ApiPath</span><span class="p">,</span> <span class="s2">&quot;api_vehicle</span><span class="se">\\</span><span class="s2">Release</span><span class="se">\\</span><span class="s2">vehicle.dll&quot;</span><span class="p">)</span>
+    <span class="n">xmlDir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ApiPath</span><span class="p">,</span> <span class="s2">&quot;api_vehicle</span><span class="se">\\</span><span class="s2">vehicle_xmls&quot;</span><span class="p">)</span>
+
+
+
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PyCosimPath</span><span class="p">,</span> <span class="s2">&quot;OpenSees_DB&quot;</span><span class="p">)):</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PyCosimPath</span><span class="p">,</span> <span class="s2">&quot;OpenSees_DB&quot;</span><span class="p">))</span>
+
+    <span class="n">numberofCarbodies</span><span class="o">=</span><span class="mi">5</span>
+    <span class="n">vehicleLength</span> <span class="o">=</span> <span class="mf">26.0</span> <span class="o">*</span> <span class="n">numberofCarbodies</span>
+    <span class="n">spline_extension</span> <span class="o">=</span> <span class="mi">3000</span>
+    <span class="n">CosimSteps</span> <span class="o">=</span> <span class="mi">200</span>
+    <span class="n">bridgeLength</span> <span class="o">=</span> <span class="mf">168.0</span>
+    <span class="n">vehicleSpeed</span> <span class="o">=</span> <span class="mf">55.0</span>
+    <span class="c1"># irregularityX, irregularityY = irregularity(1, 1, bridgeLength + 2 * 3000, vehicleSpeed)</span>
+    <span class="c1"># writeIrre(irregularityX, irregularityY)</span>
+    <span class="n">irregularityX</span><span class="p">,</span> <span class="n">irregularityY</span> <span class="o">=</span> <span class="n">readIrregularityFromFile</span><span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">srcFolderPath</span><span class="p">,</span> <span class="s2">&quot;Irregularity.txt&quot;</span><span class="p">))</span>
+    <span class="n">parametersFile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">absolute</span><span class="p">(),</span> <span class="s2">&quot;Parameters.txt&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">parametersFile</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">parameterFile</span><span class="p">:</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">parameterFile</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="n">Ec</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">gap</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">stiffnessFactor</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">2</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">phiybz</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">3</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">Mybz</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">4</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">phiubz</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">5</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">Mubz</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">6</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">phiyby</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">7</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">Myby</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">8</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">phiuby</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">9</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">Muby</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">10</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">eqFolderName</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">11</span><span class="p">])</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">projectPath</span><span class="p">,</span> <span class="s2">&quot;Results&quot;</span><span class="p">)):</span>
+        <span class="n">resultDir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">projectPath</span><span class="p">,</span> <span class="s2">&quot;Results&quot;</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">resultDir</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">resultDir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">projectPath</span><span class="p">,</span> <span class="s2">&quot;Results&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">eqDirection</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">resultDirPerDirection</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">resultDir</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">resultDir</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">)):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">resultDirPerDirection</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">resultDirPerDirection</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">resultDir</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">resultDir</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">)):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">resultDirPerDirection</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">indx</span><span class="p">,</span> <span class="n">folderName</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">eqFolderName</span><span class="p">):</span>
+        <span class="n">eqFiles</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">eqPath</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">folderName</span><span class="p">))</span>
+        <span class="n">case_indx</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">eqFiles</span><span class="p">):</span>
+            <span class="n">case_indx</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">fileName</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">eqFiles</span><span class="p">,</span> <span class="n">files</span><span class="p">)</span>
+            <span class="n">eqStartTime</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># eqStartTime = createEQstartsV2(fileName)</span>
+            <span class="n">eqTime</span><span class="p">,</span> <span class="n">eqValues</span> <span class="o">=</span> <span class="n">LoadRecordTimeandValues</span><span class="p">(</span><span class="n">fileName</span><span class="p">)</span>
+            <span class="c1"># CosimSteps = int(eqTime[-1] / 0.2)</span>
+            <span class="n">spline_extension</span> <span class="o">=</span> <span class="n">getSplineExtension</span><span class="p">(</span>
+                <span class="n">vehicleSpeed</span><span class="p">,</span> <span class="n">eqTime</span><span class="p">,</span> <span class="n">eqValues</span><span class="p">)</span> <span class="o">+</span> <span class="n">vehicleLength</span> <span class="o">+</span> <span class="mi">20</span>
+            <span class="n">orch</span> <span class="o">=</span> <span class="n">Orch</span><span class="p">(</span><span class="n">dllDir</span><span class="p">,</span> <span class="n">xmlDir</span><span class="p">,</span><span class="n">spline_extension</span><span class="p">,</span> <span class="n">CosimSteps</span><span class="p">,</span> <span class="n">bridgeLength</span><span class="p">,</span> <span class="n">eqTime</span><span class="p">,</span> <span class="n">eqValues</span><span class="p">,</span> <span class="n">irregularityX</span><span class="p">,</span>
+                        <span class="n">irregularityY</span><span class="p">,</span>
+                        <span class="n">Ec</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span>
+                        <span class="n">gap</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">stiffnessFactor</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">phiybz</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">Mybz</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">phiubz</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">Mubz</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span>
+                        <span class="n">phiyby</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">Myby</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">phiuby</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">Muby</span><span class="p">[</span><span class="n">indx</span><span class="p">],</span> <span class="n">eqStartTime</span><span class="p">,</span> <span class="n">eqDirection</span><span class="p">,</span> <span class="n">vehicleSpeed</span><span class="p">)</span>
+            <span class="n">orch</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">vehicleAccel</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">bogieAccel</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">pierTopsDict</span><span class="p">,</span> <span class="n">pierBaseDict</span><span class="p">,</span> <span class="n">bearingTop</span><span class="p">,</span> <span class="n">bearingBase</span><span class="p">,</span> <span class="n">abutmntX</span><span class="p">,</span> <span class="n">abutmntY</span><span class="p">,</span> <span class="n">forces</span><span class="p">,</span> <span class="n">vehicleAccelerations</span><span class="p">,</span> <span class="n">bogieAccelerations</span><span class="p">,</span> <span class="n">verticalAccelControlPoints</span><span class="p">,</span> <span class="n">r</span> <span class="o">=</span> <span class="n">orch</span><span class="o">.</span><span class="n">solution</span><span class="p">()</span>
+            <span class="n">forceZonly</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">forces</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="mi">3</span><span class="p">):</span>
+                    <span class="n">forceZonly</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vehicleAccelerations</span><span class="p">)):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vehicleAccelerations</span><span class="p">[</span><span class="n">i</span><span class="p">])):</span>
+                    <span class="n">vehicleAccel</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">vehicleAccelerations</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bogieAccelerations</span><span class="p">)):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bogieAccelerations</span><span class="p">[</span><span class="n">i</span><span class="p">])):</span>
+                    <span class="n">bogieAccel</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bogieAccelerations</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">])</span>
+            <span class="n">saveOutputFile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">resultDirPerDirection</span><span class="p">,</span> <span class="s2">&quot;line&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">indx</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="n">files</span><span class="p">)</span>
+            <span class="n">saveOutputFile_extra</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">resultDirPerDirection</span><span class="p">,</span> <span class="s2">&quot;extra_line&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">indx</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="n">files</span><span class="p">)</span>
+            <span class="n">writeOutputsT4wForces</span><span class="p">(</span><span class="n">saveOutputFile</span><span class="p">,</span> <span class="n">pierTopsDict</span><span class="p">,</span> <span class="n">pierBaseDict</span><span class="p">,</span> <span class="n">bearingTop</span><span class="p">,</span> <span class="n">bearingBase</span><span class="p">,</span> <span class="n">abutmntX</span><span class="p">,</span>
+                                  <span class="n">abutmntY</span><span class="p">,</span> <span class="n">forceZonly</span><span class="p">,</span> <span class="n">vehicleAccel</span><span class="p">,</span> <span class="n">bogieAccel</span><span class="p">,</span>
+                                  <span class="nb">int</span><span class="p">(</span><span class="n">eqDirection</span><span class="p">))</span>
+            <span class="n">writeExtraOutputsT45wForces</span><span class="p">(</span><span class="n">saveOutputFile_extra</span><span class="p">,</span> <span class="n">verticalAccelControlPoints</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span>
+            <span class="k">del</span> <span class="n">orch</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PyCosimPath</span><span class="p">,</span> <span class="s2">&quot;OpenSees_DB&quot;</span><span class="p">)):</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PyCosimPath</span><span class="p">,</span> <span class="s2">&quot;OpenSees_DB&quot;</span><span class="p">))</span>
+
+</pre></div>
+</div>
+</div>
+<p>Also some basic data are defined in this point of the code</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 84%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Property</p></th>
+<th class="head"><p>Discription</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>numberofCarbodies</p></td>
+<td><p>The number of carbodies of the train</p></td>
+</tr>
+<tr class="row-odd"><td><p>vehicleLength</p></td>
+<td><p>The length of the vehicle = (Length of each car)*(numberofCarbodies)</p></td>
+</tr>
+<tr class="row-even"><td><p>spline_extension</p></td>
+<td><p>The extension of the spline outside of the bridge. This applies to each side of the bridge</p></td>
+</tr>
+<tr class="row-odd"><td><p>bridgeLength</p></td>
+<td><p>The total length of the bridge structure</p></td>
+</tr>
+<tr class="row-even"><td><p>vehicleSpeed</p></td>
+<td><p>The speed of the train in [m/sec]</p></td>
+</tr>
+</tbody>
+</table>
+<p>The function <em>__init__</em> initialize the basic parameters of the cosimulation. It receives these parameters from the <em>multiple analysis</em>.</p>
+<div class="literal-block-wrapper docutils container" id="init-orch">
+<div class="code-block-caption"><span class="caption-text"><strong>__init__</strong></span><a class="headerlink" href="#init-orch" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>    def __init__(self, dllDir, xmlDir,spline_extension, CosimSteps, bridgeLenght, eqTime, eqValues, irregularityX,
+                 irregularityY, Ec,
+                 gap, stiffnessFactor, phiybz, Mybz, phiubz, Mubz, phiyby, Myby, phiuby, Μυby, eqStartTime,
+                 eqDirection, vehicle_speed):
+
+        self.dllDir = dllDir
+        self.xmlDir = xmlDir
+        self.spline_extension = spline_extension
+        self.num_of_spline_extension = 20
+        self.CosimSteps = CosimSteps
+        self.bridgeLength = bridgeLenght
+        self.eqTime = eqTime
+        self.eqValues = eqValues
+        self.irregularityX = irregularityX
+        self.irregularityY = irregularityY
+        self.eqStartTime = eqStartTime
+        self.eqDirection = eqDirection
+        self.vehicle_speed = vehicle_speed
+
+        self.Ec = Ec
+        self.gap = gap
+        self.stiffnessFactor = stiffnessFactor
+        self.phiybz = phiybz
+        self.Mybz = Mybz
+        self.phiubz = phiubz
+        self.Mubz = Mubz
+        self.phiyby = phiyby
+        self.Myby = Myby
+        self.phiuby = phiuby
+        self.Muby = Μυby
+
+        self.x_ext = []
+        for i in range(self.num_of_spline_extension):
+            self.x_ext.append(
+                (i - self.num_of_spline_extension) * (self.spline_extension / self.num_of_spline_extension))
+        self.x_ext1 = []
+        for i in range(self.num_of_spline_extension):
+            self.x_ext1.append(self.bridgeLength + (i + 1) *
+                               (self.spline_extension / self.num_of_spline_extension))
+
+</pre></div>
+</div>
+</div>
+<p>The function <em>time</em>  sets the timesteps for each subsystem and the communication interval.</p>
+<div class="literal-block-wrapper docutils container" id="time-orch">
+<div class="code-block-caption"><span class="caption-text"><strong>time</strong></span><a class="headerlink" href="#time-orch" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>    <span class="k">def</span> <span class="nf">time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">globalTime</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtCosim</span>    <span class="o">=</span> <span class="mf">0.1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtBridge</span>   <span class="o">=</span> <span class="mf">0.025</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtBoogie</span>   <span class="o">=</span> <span class="mf">0.0025</span>
+</pre></div>
+</div>
+</div>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 83%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Property</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>globalTime</p></td>
+<td><p>Set the global time at the beginning of the problem</p></td>
+</tr>
+<tr class="row-odd"><td><p>dtCosim</p></td>
+<td><p>Set the cosimulation step H</p></td>
+</tr>
+<tr class="row-even"><td><p>dtBridge</p></td>
+<td><p>Set the time step for the analysis of the bridge structure</p></td>
+</tr>
+<tr class="row-odd"><td><p>dtBoogie</p></td>
+<td><p>Set the time step for the analysis of the vehicle</p></td>
+</tr>
+</tbody>
+</table>
+<p>The function <em>solution</em> runs the communication analysis. Sends and receives the input/output of each subsystem, checks convergence conditions at the interfaces, and restores or updates (convergence) the systems states. Furthermore, it saves to specific structures selected results for post process.</p>
+<div class="literal-block-wrapper docutils container" id="solution-orch">
+<div class="code-block-caption"><span class="caption-text"><strong>solution</strong></span><a class="headerlink" href="#solution-orch" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>    <span class="k">def</span> <span class="nf">solution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">x_new</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">3000</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">irregularityX</span><span class="p">]</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">interpolate</span><span class="o">.</span><span class="n">interp1d</span><span class="p">(</span><span class="n">x_new</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">irregularityY</span><span class="p">)</span>
+        <span class="n">ncp</span> <span class="o">=</span> <span class="mi">120</span>
+        <span class="n">cp_positions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+        <span class="n">cp_velocities</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+        <span class="n">cp_forces</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+
+        <span class="n">cp_positions1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+        <span class="n">cp_velocities1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+        <span class="n">cp_forces1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+
+        <span class="n">cp_positions10</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+        <span class="n">cp_velocities10</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+        <span class="n">cp_forces10</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+
+        <span class="c1"># Remains as it is</span>
+        <span class="n">x_v_l_n</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">y_v_l_n</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">z_v_l_n</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">x_v_l_n1</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">y_v_l_n1</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">z_v_l_n1</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">x_v_r_n</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">y_v_r_n</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">z_v_r_n</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">x_v_r_n1</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">y_v_r_n1</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">z_v_r_n1</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">44</span><span class="p">):</span>
+            <span class="n">x_v_l_n</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">y_v_l_n</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">z_v_l_n</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">x_v_l_n1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">y_v_l_n1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">z_v_l_n1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">x_v_r_n</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">y_v_r_n</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">z_v_r_n</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">x_v_r_n1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">y_v_r_n1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">z_v_r_n1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+
+        <span class="n">tol_in</span> <span class="o">=</span> <span class="mf">0.01</span>
+        <span class="n">tol_out</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">tol_dphi</span> <span class="o">=</span> <span class="mi">1000000</span>
+        <span class="n">tol_phi</span> <span class="o">=</span> <span class="mf">0.01</span>
+        <span class="n">nn</span> <span class="o">=</span> <span class="mf">10.0</span>
+        <span class="n">krr_explicit</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">crr_explicit</span> <span class="o">=</span> <span class="mf">1.048</span>
+        <span class="n">xml0_path</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">xmlDir</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">veh_0.xml&quot;</span>
+        <span class="n">xml1_path</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">xmlDir</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">veh_1.xml&quot;</span>
+        <span class="n">xml2_path</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">xmlDir</span><span class="o">+</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">veh_2.xml&quot;</span>
+        <span class="n">vx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vehicle_speed</span>
+        <span class="n">iiter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">convergence</span> <span class="o">=</span> <span class="mi">100</span>
+        <span class="n">tol</span> <span class="o">=</span> <span class="mf">0.01</span>
+        <span class="n">tag</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># vehicle</span>
+        <span class="n">cosim_converge</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="n">first_time</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">force</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># bridge lists for outputs)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pierTopsDict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Node6&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                             <span class="s2">&quot;Node7&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                             <span class="s2">&quot;Node8&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">pierBaseDict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Node9&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                             <span class="s2">&quot;Node10&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                             <span class="s2">&quot;Node11&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">bearingTop</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Node136&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node138&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node140&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node142&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node144&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node146&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node148&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node150&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node152&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                           <span class="s2">&quot;Node154&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">bearingBase</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Node137&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node139&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node141&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node143&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node145&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node147&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node149&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node151&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node153&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                            <span class="s2">&quot;Node155&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">abutmntX</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Node156&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node157&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node162&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node163&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node1560&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node1620&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">abutmntY</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Node182&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node182000&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node183&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node183000&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node184&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node184000&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node185&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                         <span class="s2">&quot;Node185000&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+
+        <span class="n">bridgeTag</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">vehicleTag</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="n">vehicleTag1</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># REMOVE IT</span>
+        <span class="n">forces</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">vehicleAccelerations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">bogieAccelerations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">verticalAccelControlPoints</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># load dll</span>
+        <span class="n">vehicleLoaddll</span> <span class="o">=</span> <span class="n">ct</span><span class="o">.</span><span class="n">CDLL</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dllDir</span><span class="p">)</span>
+        <span class="n">handle</span> <span class="o">=</span> <span class="n">vehicleLoaddll</span><span class="o">.</span><span class="n">_handle</span>
+        <span class="n">bridgeSubSteps</span><span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtCosim</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">dtBridge</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">istep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">CosimSteps</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">while</span> <span class="n">iiter</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">convergence</span> <span class="o">&gt;</span> <span class="n">tol</span><span class="p">:</span>
+                    <span class="n">bridge</span> <span class="o">=</span> <span class="n">Bridge</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Ec</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">gap</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">stiffnessFactor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phiybz</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Mybz</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phiubz</span><span class="p">,</span>
+                                      <span class="bp">self</span><span class="o">.</span><span class="n">Muby</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phiyby</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Myby</span><span class="p">,</span>
+                                      <span class="bp">self</span><span class="o">.</span><span class="n">phiuby</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Muby</span><span class="p">,</span>
+                                      <span class="bp">self</span><span class="o">.</span><span class="n">dtBridge</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">globalTime</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">eqTime</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">eqValues</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">eqDirection</span><span class="p">)</span>
+                    <span class="n">bridge</span><span class="o">.</span><span class="n">initialize_model</span><span class="p">()</span>
+                    <span class="n">bridge</span><span class="o">.</span><span class="n">construct_model</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">bridgeTag</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">bridge</span><span class="o">.</span><span class="n">solve_gravity</span><span class="p">()</span>
+                        <span class="n">bridgeTag</span> <span class="o">=</span> <span class="mi">1</span>
+                    <span class="n">bridge</span><span class="o">.</span><span class="n">restore</span><span class="p">()</span>
+                    <span class="n">bridge</span><span class="o">.</span><span class="n">add_nodalLoad</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">cp_positions</span><span class="p">,</span> <span class="n">cp_velocities</span><span class="p">,</span> <span class="n">cp_forces</span><span class="p">,</span><span class="n">bridgeSubSteps</span><span class="p">)</span>
+                    <span class="n">bridge</span><span class="o">.</span><span class="n">add_nodalLoad</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">cp_positions1</span><span class="p">,</span> <span class="n">cp_velocities1</span><span class="p">,</span> <span class="n">cp_forces1</span><span class="p">,</span><span class="n">bridgeSubSteps</span><span class="p">)</span>
+                    <span class="n">x_p_l_n</span><span class="p">,</span> <span class="n">y_p_l_n</span><span class="p">,</span> <span class="n">z_p_l_n_woIr</span><span class="p">,</span> <span class="n">x_p_l_n1</span><span class="p">,</span> <span class="n">y_p_l_n1</span><span class="p">,</span> <span class="n">z_p_l_n1_woIr</span><span class="p">,</span> <span class="n">x_p_r_n</span><span class="p">,</span> <span class="n">y_p_r_n</span><span class="p">,</span> <span class="n">z_p_r_n_woIr</span><span class="p">,</span> <span class="n">x_p_r_n1</span><span class="p">,</span> <span class="n">y_p_r_n1</span><span class="p">,</span> <span class="n">z_p_r_n1_woIr</span><span class="p">,</span> \
+                    <span class="n">xx_v_l_n</span><span class="p">,</span> <span class="n">yy_v_l_n</span><span class="p">,</span> <span class="n">zz_v_l_n</span><span class="p">,</span> <span class="n">xx_v_l_n1</span><span class="p">,</span> <span class="n">yy_v_l_n1</span><span class="p">,</span> <span class="n">zz_v_l_n1</span><span class="p">,</span> <span class="n">xx_v_r_n</span><span class="p">,</span> <span class="n">yy_v_r_n</span><span class="p">,</span> <span class="n">zz_v_r_n</span><span class="p">,</span> <span class="n">xx_v_r_n1</span><span class="p">,</span> <span class="n">yy_v_r_n1</span><span class="p">,</span> <span class="n">zz_v_r_n1</span><span class="p">,</span> <span class="n">verticalAccel</span><span class="p">,</span> <span class="n">r2return</span> <span class="o">=</span> <span class="n">bridge</span><span class="o">.</span><span class="n">solve_transient</span><span class="p">()</span>
+                    <span class="c1"># only for explicit------------</span>
+                    <span class="n">cp_positions</span> <span class="o">=</span> <span class="n">cp_positions1</span>
+                    <span class="n">cp_velocities</span> <span class="o">=</span> <span class="n">cp_velocities1</span>
+                    <span class="n">cp_forces</span> <span class="o">=</span> <span class="n">cp_forces1</span>
+                    <span class="c1"># ------------------------------</span>
+                    <span class="n">vel1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+                    <span class="n">vel2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+                    <span class="n">x_v_l_n</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">xx_v_l_n</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">y_v_l_n</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">yy_v_l_n</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">z_v_l_n</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">zz_v_l_n</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">x_v_l_n1</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">xx_v_l_n1</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">y_v_l_n1</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">yy_v_l_n1</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">z_v_l_n1</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">zz_v_l_n1</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">x_v_r_n</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">xx_v_r_n</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">y_v_r_n</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">yy_v_r_n</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">z_v_r_n</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">zz_v_r_n</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">x_v_r_n1</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">xx_v_r_n1</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">y_v_r_n1</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">yy_v_r_n1</span> <span class="o">+</span> <span class="n">vel2</span>
+                    <span class="n">z_v_r_n1</span> <span class="o">=</span> <span class="n">vel1</span> <span class="o">+</span> <span class="n">zz_v_r_n1</span> <span class="o">+</span> <span class="n">vel2</span>
+
+                    <span class="n">z_irreg</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">x_p_l_n</span><span class="p">)</span>
+                    <span class="n">y_begin_l</span> <span class="o">=</span> <span class="n">y_p_l_n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">y_begin_l1</span> <span class="o">=</span> <span class="n">y_p_l_n1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">y_begin_r</span> <span class="o">=</span> <span class="n">y_p_r_n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">y_begin_r1</span> <span class="o">=</span> <span class="n">y_p_r_n1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">y_last_l</span> <span class="o">=</span> <span class="n">y_p_l_n</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">y_last_l1</span> <span class="o">=</span> <span class="n">y_p_l_n1</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">y_last_r</span> <span class="o">=</span> <span class="n">y_p_r_n</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">y_last_r1</span> <span class="o">=</span> <span class="n">y_p_r_n1</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">z_begin_l</span> <span class="o">=</span> <span class="n">z_p_l_n_woIr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">z_begin_l1</span> <span class="o">=</span> <span class="n">z_p_l_n1_woIr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">z_begin_r</span> <span class="o">=</span> <span class="n">z_p_r_n_woIr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">z_begin_r1</span> <span class="o">=</span> <span class="n">z_p_r_n1_woIr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">z_last_l</span> <span class="o">=</span> <span class="n">z_p_l_n_woIr</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">z_last_l1</span> <span class="o">=</span> <span class="n">z_p_l_n1_woIr</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">z_last_r</span> <span class="o">=</span> <span class="n">z_p_r_n_woIr</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">z_last_r1</span> <span class="o">=</span> <span class="n">z_p_r_n1_woIr</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">y_ext_l</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">y_ext_l1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">y_ext_r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">y_ext_r1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">z_ext_l</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">z_ext_l1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">z_ext_r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">z_ext_r1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">y_ext1_l</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">y_ext1_l1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">y_ext1_r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">y_ext1_r1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">z_ext1_l</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">z_ext1_l1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">z_ext1_r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="n">z_ext1_r1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_of_spline_extension</span><span class="p">):</span>
+                        <span class="n">y_ext_l</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_begin_l</span>
+                        <span class="n">y_ext_l1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_begin_l1</span>
+                        <span class="n">z_ext_l</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_begin_l</span> <span class="o">+</span> <span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.0</span>
+                        <span class="n">z_ext_l1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_begin_l1</span> <span class="o">+</span> <span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.0</span>
+                        <span class="n">y_ext_r</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_begin_r</span>
+                        <span class="n">y_ext_r1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_begin_r1</span>
+                        <span class="n">z_ext_r</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_begin_r</span> <span class="o">+</span> <span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.0</span>
+                        <span class="n">z_ext_r1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_begin_r1</span> <span class="o">+</span> <span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.0</span>
+                        <span class="n">y_ext1_l</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_last_l</span>
+                        <span class="n">y_ext1_l1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_last_l1</span>
+                        <span class="n">z_ext1_l</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_last_l</span> <span class="o">+</span> <span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                        <span class="n">z_ext1_l1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_last_l1</span> <span class="o">+</span> <span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                        <span class="n">y_ext1_r</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_last_r</span>
+                        <span class="n">y_ext1_r1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_last_r1</span>
+                        <span class="n">z_ext1_r</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_last_r</span> <span class="o">+</span> <span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                        <span class="n">z_ext1_r1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_last_r1</span> <span class="o">+</span> <span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                    <span class="n">z_p_l_n</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="o">+</span> <span class="n">z_irreg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                               <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">z_p_l_n_woIr</span><span class="p">)]</span>
+                    <span class="n">z_p_l_n1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="o">+</span> <span class="n">z_irreg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">z_p_l_n1_woIr</span><span class="p">)]</span>
+                    <span class="n">z_p_r_n</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="o">+</span> <span class="n">z_irreg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                               <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">z_p_r_n_woIr</span><span class="p">)]</span>
+                    <span class="n">z_p_r_n1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="o">+</span> <span class="n">z_irreg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">z_p_r_n1_woIr</span><span class="p">)]</span>
+
+                    <span class="n">t0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">globalTime</span>
+                    <span class="n">t1</span> <span class="o">=</span> <span class="n">t0</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtCosim</span>
+                    <span class="n">nintervals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtCosim</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtBoogie</span>
+                    <span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">cp_forces1</span><span class="p">]</span>
+                    <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>  <span class="c1"># To choose in dt to insert the train</span>
+                    <span class="k">if</span> <span class="n">vehicleTag</span><span class="p">:</span>  <span class="c1"># if self.eqStartTime &lt;= t0:</span>
+                        <span class="k">if</span> <span class="n">vehicleTag1</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">x_o_vehicle</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spline_extension</span> <span class="o">-</span> <span class="mi">20</span><span class="p">)</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">y_o_vehicle</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_begin_l</span> <span class="o">+</span> <span class="n">y_begin_r</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">z_o_vehicle</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="p">(</span><span class="n">z_begin_l</span> <span class="o">+</span> <span class="n">z_begin_r</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+                            <span class="n">vehicleTag1</span> <span class="o">=</span> <span class="mi">1</span>
+
+                        <span class="n">xln</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span> <span class="o">+</span> <span class="n">x_p_l_n</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_ext1</span><span class="p">)</span>
+                        <span class="n">xxln</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xln</span><span class="p">]</span>
+                        <span class="n">yln</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_ext_l</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">+</span> <span class="n">y_p_l_n</span> <span class="o">+</span> <span class="n">y_ext1_l</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                        <span class="n">yyln</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">yln</span><span class="p">]</span>
+                        <span class="n">zln</span> <span class="o">=</span> <span class="p">(</span><span class="n">z_ext_l</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">+</span> <span class="n">z_p_l_n</span> <span class="o">+</span> <span class="n">z_ext1_l</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                        <span class="n">zzln</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">zln</span><span class="p">]</span>
+                        <span class="n">xln1</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span> <span class="o">+</span> <span class="n">x_p_l_n1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_ext1</span><span class="p">)</span>
+                        <span class="n">xxln1</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xln1</span><span class="p">]</span>
+                        <span class="n">yln1</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_ext_l1</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">+</span> <span class="n">y_p_l_n1</span> <span class="o">+</span> <span class="n">y_ext1_l1</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                        <span class="n">yyln1</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">yln1</span><span class="p">]</span>
+                        <span class="n">zln1</span> <span class="o">=</span> <span class="p">(</span><span class="n">z_ext_l1</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">+</span> <span class="n">z_p_l_n1</span> <span class="o">+</span> <span class="n">z_ext1_l1</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                        <span class="n">zzln1</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">zln1</span><span class="p">]</span>
+                        <span class="n">xrn</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span> <span class="o">+</span> <span class="n">x_p_r_n</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_ext1</span><span class="p">)</span>
+                        <span class="n">xxrn</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xrn</span><span class="p">]</span>
+                        <span class="n">yrn</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_ext_r</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">+</span> <span class="n">y_p_r_n</span> <span class="o">+</span> <span class="n">y_ext1_r</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                        <span class="n">yyrn</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">yrn</span><span class="p">]</span>
+                        <span class="n">zrn</span> <span class="o">=</span> <span class="p">(</span><span class="n">z_ext_r</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">+</span> <span class="n">z_p_r_n</span> <span class="o">+</span> <span class="n">z_ext1_r</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                        <span class="n">zzrn</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">zrn</span><span class="p">]</span>
+                        <span class="n">xrn1</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_ext</span> <span class="o">+</span> <span class="n">x_p_r_n1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_ext1</span><span class="p">)</span>
+                        <span class="n">xxrn1</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xrn1</span><span class="p">]</span>
+                        <span class="n">yrn1</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_ext_r1</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">+</span> <span class="n">y_p_r_n1</span> <span class="o">+</span> <span class="n">y_ext1_r1</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                        <span class="n">yyrn1</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">yrn1</span><span class="p">]</span>
+                        <span class="n">zrn1</span> <span class="o">=</span> <span class="p">(</span><span class="n">z_ext_r1</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">+</span> <span class="n">z_p_r_n1</span> <span class="o">+</span> <span class="n">z_ext1_r1</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                        <span class="n">zzrn1</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_o_vehicle</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">zrn1</span><span class="p">]</span>
+
+                        <span class="n">t00</span> <span class="o">=</span> <span class="mf">0.0</span>
+                        <span class="n">vehicle</span> <span class="o">=</span> <span class="n">FixedVehicleDll</span><span class="p">(</span><span class="n">vehicleLoaddll</span><span class="p">,</span> <span class="n">cosim_converge</span><span class="p">,</span> <span class="n">first_time</span><span class="p">,</span> <span class="n">t00</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtCosim</span><span class="p">,</span>
+                                                  <span class="n">nintervals</span><span class="p">,</span>
+                                                  <span class="n">tol_in</span><span class="p">,</span>
+                                                  <span class="n">tol_out</span><span class="p">,</span>
+                                                  <span class="n">tol_dphi</span><span class="p">,</span>
+                                                  <span class="n">tol_phi</span><span class="p">,</span> <span class="n">nn</span><span class="p">,</span> <span class="n">krr_explicit</span><span class="p">,</span> <span class="n">crr_explicit</span><span class="p">,</span>
+                                                  <span class="n">xml0_path</span><span class="p">,</span> <span class="n">xml1_path</span><span class="p">,</span> <span class="n">xml2_path</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span>
+                                <span class="nb">len</span><span class="p">(</span><span class="n">xxln</span><span class="p">)),</span> <span class="n">vx</span><span class="p">,</span>
+                                                  <span class="n">xxln</span><span class="p">,</span> <span class="n">yyln</span><span class="p">,</span> <span class="n">zzln</span><span class="p">,</span>
+                                                  <span class="n">xxln1</span><span class="p">,</span> <span class="n">yyln1</span><span class="p">,</span> <span class="n">zzln1</span><span class="p">,</span>
+                                                  <span class="n">xxrn</span><span class="p">,</span> <span class="n">yyrn</span><span class="p">,</span> <span class="n">zzrn</span><span class="p">,</span>
+                                                  <span class="n">xxrn1</span><span class="p">,</span> <span class="n">yyrn1</span><span class="p">,</span> <span class="n">zzrn1</span><span class="p">,</span>
+                                                  <span class="n">x_v_l_n</span><span class="p">,</span> <span class="n">y_v_l_n</span><span class="p">,</span> <span class="n">z_v_l_n</span><span class="p">,</span>
+                                                  <span class="n">x_v_l_n1</span><span class="p">,</span> <span class="n">y_v_l_n1</span><span class="p">,</span> <span class="n">z_v_l_n1</span><span class="p">,</span>
+                                                  <span class="n">x_v_r_n</span><span class="p">,</span> <span class="n">y_v_r_n</span><span class="p">,</span> <span class="n">z_v_r_n</span><span class="p">,</span>
+                                                  <span class="n">x_v_r_n1</span><span class="p">,</span> <span class="n">y_v_r_n1</span><span class="p">,</span> <span class="n">z_v_r_n1</span><span class="p">,</span> <span class="n">ncp</span><span class="p">)</span>
+                        <span class="n">cosim_converge</span> <span class="o">=</span> <span class="bp">False</span>
+                        <span class="n">cp_positions10</span><span class="p">,</span> <span class="n">cp_velocities10</span><span class="p">,</span> <span class="n">cp_forces10</span><span class="p">,</span> <span class="n">vehicle_accelerations</span><span class="p">,</span> <span class="n">bogie_accelerations</span><span class="p">,</span> <span class="n">bogie_yaws</span> <span class="o">=</span> <span class="n">vehicle</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
+                        <span class="n">cp_forces10</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="o">/</span> <span class="mf">1000.0</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span>
+                                                           <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_forces10</span><span class="p">)]</span>
+                        <span class="k">del</span> <span class="n">vehicle</span>
+                        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">cp_positions10</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.01</span><span class="p">:</span>
+                            <span class="n">cp_positions1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span>
+                                                        <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_positions10</span><span class="p">)]</span>
+                            <span class="n">cp_velocities1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span>
+                                                         <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_velocities10</span><span class="p">)]</span>
+                            <span class="n">cp_forces1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span>
+                                                     <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_forces10</span><span class="p">)]</span>
+                            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cp_positions1</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)):</span>
+                                <span class="n">cp_positions1</span><span class="p">[</span><span class="mi">3</span> <span class="o">*</span> <span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_o_vehicle</span>
+                                <span class="n">cp_positions1</span><span class="p">[</span><span class="mi">3</span> <span class="o">*</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_o_vehicle</span>
+                                <span class="n">cp_positions1</span><span class="p">[</span><span class="mi">3</span> <span class="o">*</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_o_vehicle</span>
+
+                            <span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="n">res</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span>
+                                                       <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_forces1</span><span class="p">)]</span>
+
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">convergence</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span>
+                                <span class="n">res</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">cp_forces1</span><span class="p">)</span>
+                        <span class="k">except</span><span class="p">:</span>
+                            <span class="n">convergence</span> <span class="o">=</span> <span class="mi">100</span>
+                            <span class="n">cp_positions1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span>
+                                                        <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_positions</span><span class="p">)]</span>
+                            <span class="n">cp_velocities1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span>
+                                                         <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_velocities</span><span class="p">)]</span>
+                            <span class="n">cp_forces1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span>
+                                                     <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_forces</span><span class="p">)]</span>
+                        <span class="n">iiter</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">cp_positions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+                        <span class="n">cp_velocities</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+                        <span class="n">cp_forces</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+                        <span class="n">vehicle_accelerations</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncp</span><span class="p">)</span>
+                        <span class="n">convergence</span> <span class="o">=</span> <span class="n">tol</span> <span class="o">/</span> <span class="mf">10.0</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">print</span><span class="p">(</span><span class="s2">&quot;analysis failed&quot;</span><span class="p">)</span>
+                <span class="k">break</span>
+            <span class="n">cp_positions1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_positions1</span><span class="p">)]</span>
+            <span class="n">cp_velocities1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_velocities1</span><span class="p">)]</span>
+            <span class="n">cp_forces1</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_forces1</span><span class="p">)]</span>
+
+
+            <span class="k">if</span> <span class="n">cp_positions1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bridgeLength</span><span class="p">:</span>
+                <span class="n">vehicleTag</span> <span class="o">=</span> <span class="bp">False</span>
+                <span class="n">cp_positions1</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span> <span class="o">*</span> <span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_positions1</span><span class="p">)]</span>
+                <span class="n">cp_velocities1</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span> <span class="o">*</span> <span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_velocities1</span><span class="p">)]</span>
+                <span class="n">cp_forces1</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span> <span class="o">*</span> <span class="n">values</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cp_forces1</span><span class="p">)]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">globalTime</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">globalTime</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtCosim</span>
+            <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Time: {}, iter: {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">globalTime</span><span class="p">,</span> <span class="n">iiter</span><span class="p">))</span>
+            <span class="n">first_time</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="n">cosim_converge</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="n">iiter</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">globalTime</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">bridge</span><span class="p">)</span>
+            <span class="n">forces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cp_forces10</span><span class="p">)</span>
+            <span class="n">vehicleAccelerations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">vehicle_accelerations</span><span class="p">))</span>
+            <span class="n">bogieAccelerations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">bogie_accelerations</span><span class="p">))</span>
+            <span class="n">verticalAccelControlPoints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">verticalAccel</span><span class="p">)</span>
+            <span class="n">r</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r2return</span><span class="p">)</span>
+            <span class="n">convergence</span> <span class="o">=</span> <span class="mi">100</span>
+        <span class="c1"># unload dll</span>
+        <span class="k">del</span> <span class="n">vehicleLoaddll</span>
+        <span class="n">FreeLibrary</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+        <span class="k">del</span> <span class="n">handle</span>
+        <span class="c1"># return</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pierTopsDict</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pierBaseDict</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bearingTop</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bearingBase</span><span class="p">,</span> \
+               <span class="bp">self</span><span class="o">.</span><span class="n">abutmntX</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">abutmntY</span><span class="p">,</span> <span class="n">forces</span><span class="p">,</span> <span class="n">vehicleAccelerations</span><span class="p">,</span> <span class="n">bogieAccelerations</span><span class="p">,</span> <span class="n">verticalAccelControlPoints</span><span class="p">,</span> <span class="n">r</span>
+</pre></div>
+</div>
+</div>
+<p>The function <em>update</em>  updates the subsystems states and</p>
+<div class="literal-block-wrapper docutils container" id="update-orch">
+<div class="code-block-caption"><span class="caption-text"><strong>update</strong></span><a class="headerlink" href="#update-orch" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bridge</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pierTopsDict</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pierBaseDict</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bearingTop</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bearingBase</span><span class="p">,</span> \
+        <span class="bp">self</span><span class="o">.</span><span class="n">abutmntX</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">abutmntY</span> <span class="o">=</span> <span class="n">bridge</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">eqDirection</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pierTopsDict</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pierBaseDict</span><span class="p">,</span>
+                                                     <span class="bp">self</span><span class="o">.</span><span class="n">bearingTop</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bearingBase</span><span class="p">,</span>
+                                                     <span class="bp">self</span><span class="o">.</span><span class="n">abutmntX</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">abutmntY</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="page-break section" id="bridge">
+<h2>bridge<a class="headerlink" href="#bridge" title="Permalink to this headline">¶</a></h2>
+<p>The <em>bridge</em> contains all the bridge-related information. The class bridge contains the following properties.</p>
+<div class="literal-block-wrapper docutils container" id="class-bridge">
+<div class="code-block-caption"><span class="caption-text"><strong>class Bridge</strong></span><a class="headerlink" href="#class-bridge" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>class Bridge(object):
+
+    def __init__(self, Ec, gap, stiffnessFactor, phiybz, Mybz, phiubz, Mubz, phiyby, Myby, phiuby, Μυby, dt, globalT,
+                 eqTime, eqValues, eqDirection):
+    def initialize_model(self):
+    def construct_model(self):
+    def restore(self):
+    def add_nodalLoad(self, tag, cp_position, cp_velocities, cp_forces,bridgeSubSteps):
+    def solve_gravity(self):
+    def solve_transient(self):
+    def getGroundDisp(self):
+    def update(self, eqDirection, pierTopsDict, pierBaseDict, bearingTop, bearingBase, abutmntX, abutmntY):
+</pre></div>
+</div>
+</div>
+<p>The function <em>__init__</em> initialize the basic parameters of the bridge model. It receives these parameters from the <em>orchestrator</em>.
+Also, in this function, some important node sets are defined.</p>
+<div class="literal-block-wrapper docutils container" id="init">
+<div class="code-block-caption"><span class="caption-text"><strong>__init__</strong></span><a class="headerlink" href="#init" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>    def __init__(self, Ec, gap, stiffnessFactor, phiybz, Mybz, phiubz, Mubz, phiyby, Myby, phiuby, Μυby, dt, globalT,
+                 eqTime, eqValues, eqDirection):
+        self.deckNodeID = [1, 13, 28, 29, 30, 31, 32, 33, 34, 35, 36, 14, 15, 2, 16, 17, 37, 38, 39, 40, 41, 42, 43, 44,
+                           45, 18, 19, 3, 20, 21, 46, 47, 48, 49, 50, 51, 52, 53, 54, 22, 23, 4, 24, 25, 55, 56, 57, 58,
+                           59, 60, 61,
+                           62, 63, 26, 5]
+        self.controlPoints = [1, 28, 31, 34, 14, 2, 17, 40, 42, 18, 3, 21, 49, 51, 22, 4, 25, 57, 60, 63, 5] 
+        self.pier_top_nodes = [6, 7, 8]
+        self.pier_base_nodes = [9, 10, 11]
+        self.bearing_top_nodes = [136, 138, 140, 142, 144, 146, 148, 150, 152, 154]
+        self.bearing_base_nodes = [137, 139, 141, 143, 145, 147, 149, 151, 153, 155]
+        self.abtX_nodes = [156, 157, 162, 163, 1560, 1620]
+</pre></div>
+</div>
+</div>
+<p>These sets contain the necessary information for communication with the orchestrator and the post-process operations.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 83%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>SetName</p></th>
+<th class="head"><p>Information</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>deckNodeID</p></td>
+<td><p>Includes the ID’s of nodes at the deck</p></td>
+</tr>
+<tr class="row-odd"><td><p>pier_top_nodes</p></td>
+<td><p>Includes the ID’s of nodes at piers top</p></td>
+</tr>
+<tr class="row-even"><td><p>pier_base_nodes</p></td>
+<td><p>Includes the ID’s of nodes at piers base</p></td>
+</tr>
+<tr class="row-odd"><td><p>bearing_top_nodes</p></td>
+<td><p>Includes the ID’s of nodes at bearings top</p></td>
+</tr>
+<tr class="row-even"><td><p>bearing_base_nodes</p></td>
+<td><p>Includes the ID’s of nodes at bearings base</p></td>
+</tr>
+<tr class="row-odd"><td><p>abtX_nodes</p></td>
+<td><p>Includes the ID’s of nodes at bearings base</p></td>
+</tr>
+<tr class="row-even"><td><p>abtY_nodes</p></td>
+<td><p>Includes the ID’s of nodes at bearings base</p></td>
+</tr>
+<tr class="row-odd"><td><p>controlPoints</p></td>
+<td><p>Includes the ID’s of nodes that used for the construction of rails reference spline</p></td>
+</tr>
+</tbody>
+</table>
+<p>In the function <em>construct_model</em>, the specific parametrized bridge model is defined.
+The function <em>initialize_model</em> creates the basic properties of an OpenSees model, i.e., dimension of the problem, number of degrees of freedom at each mesh node, sets the global time, and creates the database folder.
+The functions <em>solve_gravity</em> and <em>solve_transient</em> run the current model for static and dynamic loading.
+The subsystems of the formulation retain two states, the previously converged and the current trial state.
+The function <em>restore</em> resets the current trial structure state (displacements, velocity, internal parameters) to the previously converged state.
+The function <em>update</em> sets the converged state to the current trial structure state.</p>
+</div>
+<div class="page-break section" id="vehicle">
+<h2>vehicle<a class="headerlink" href="#vehicle" title="Permalink to this headline">¶</a></h2>
+<p>The analysis of the vehicle is performed by the <em>LMD</em> (Laboratory of Machine Dynamics A.U.Th.) solver. <em>LMD</em> is a general MBD solver written in C++.
+A tailor-maid version of <em>LMD</em> for the analysis of a train vehicle is wrapped in a dynamic library (vehicle.dll).
+The developed  application programmers interface (API) is described in the file <em>dev\api_vehicle\API_vehicle.h</em>
+where all available inputs/outputs are explained. These arguments are provided by the <em>orchestrator</em> at each call of the vehicle solution.</p>
+<div class="literal-block-wrapper docutils container" id="vehicleapi">
+<div class="code-block-caption"><span class="caption-text"><strong>vehicleAPI</strong></span><a class="headerlink" href="#vehicleapi" title="Permalink to this code">¶</a></div>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#ifndef VEHICLE_H_INCLUDED</span>
+<span class="cp">#define VEHICLE_H_INCLUDED</span>
+<span class="cp">#ifdef VEHICLE_EXPORTS</span>
+<span class="cp">#define VEHICLE_API __declspec(dllexport)</span>
+<span class="cp">#else</span>
+<span class="cp">#define VEHICLE_API __declspec(dllimport)</span>
+<span class="cp">#endif</span>
+
+<span class="k">extern</span> <span class="s">&quot;C&quot;</span> <span class="n">VEHICLE_API</span> <span class="kt">void</span> <span class="n">Vehicle</span><span class="p">(</span>
+  <span class="k">const</span> <span class="kt">bool</span> <span class="n">cosim_converge</span><span class="p">,</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">is_first_time</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="n">t0</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="n">t1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="n">nintervals</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="n">tol_in</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="n">tol_out</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="n">tol_dphi</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="n">tol_phi</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="n">nn</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="n">krr_explicit</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="n">crr_explicit</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">xml0_path</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">xml1_path</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">xml2_path</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">int</span> <span class="n">npoints</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="n">vx</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">x_p_l_n</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">y_p_l_n</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">z_p_l_n</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">x_p_l_n1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">y_p_l_n1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">z_p_l_n1</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">x_p_r_n</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">y_p_r_n</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">z_p_r_n</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">x_p_r_n1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">y_p_r_n1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">z_p_r_n1</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">x_v_l_n</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">y_v_l_n</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">z_v_l_n</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">x_v_l_n1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">y_v_l_n1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">z_v_l_n1</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">x_v_r_n</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">y_v_r_n</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">z_v_r_n</span><span class="p">,</span>
+  <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">x_v_r_n1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">y_v_r_n1</span><span class="p">,</span> <span class="k">const</span> <span class="kt">double</span> <span class="o">*</span><span class="n">z_v_r_n1</span><span class="p">,</span>
+  <span class="kt">double</span> <span class="o">*</span><span class="n">cp_positions</span><span class="p">,</span> <span class="kt">double</span> <span class="o">*</span><span class="n">cp_velocities</span><span class="p">,</span> <span class="kt">double</span> <span class="o">*</span><span class="n">cp_forces</span><span class="p">,</span>
+  <span class="kt">double</span> <span class="o">*</span><span class="n">vehicle_accelerations</span><span class="p">,</span> <span class="kt">double</span> <span class="o">*</span><span class="n">bogie_accelerations</span><span class="p">,</span>
+  <span class="kt">double</span> <span class="o">*</span><span class="n">bogie_yaws</span><span class="p">);</span>
+
+<span class="c1">// cosim_converge : cosimulation converge</span>
+<span class="c1">// is_first_time : is the first you are calling vehicle</span>
+<span class="c1">// t0 : previous cosimulation time</span>
+<span class="c1">// t1 : current  cosimulation time</span>
+<span class="c1">// nintervals : number of intervals for vehicle solution, thus time-step = (t1 - t0)/nintervals</span>
+<span class="c1">// tol_in : velocity tolerance (1e-3 or lower)</span>
+<span class="c1">// tol_out : residual tolerance (1e-2 or lower), must be tol_in &lt; tol_out</span>
+<span class="c1">// tol_dphi : tolerance for dphi_dt (1e-3 or lower)</span>
+<span class="c1">// tol_phi : tolerance for phi (1e-2 or lower)</span>
+
+<span class="c1">// nn:</span>
+<span class="c1">//  if nn &gt; 0.0 then krrs = ( 2.0*PI/(nn * h) )^2 * mrrs, crrs = 2.0 * sqrt(krrs * mrrs);</span>
+<span class="c1">//  if nn == 0.0 or something very small (e.g. 1e-10) then krrs = crrs = 0</span>
+<span class="c1">//  if nn &lt; 0.0 then krrs = krr_explicit, crrs = crr_explicit</span>
+
+<span class="c1">// xml1_path : path for xml1, THIS IS ALWAYS THE INPUT FOR THE DLL TO SOLVE</span>
+<span class="c1">// xml0_path : path for xml0, used as input (copying it to xml1) only when is_first_time = true</span>
+<span class="c1">// xml1_path : path for xml1, used as input when is_first_time = false, this means that at least</span>
+<span class="c1">//             one cosim_converge has occured</span>
+<span class="c1">// xml2_path : path for xml2, used to keep the results from the xml1_run in case there is cosim_converge</span>
+
+<span class="c1">// npoints : number of interpolation points for the position-velocity splines</span>
+<span class="c1">// vx : the constant forward velocity of the front vehicle</span>
+
+<span class="c1">// x_p_l_n  : x coords of interpolation points, for position spline, left rail, spline at n</span>
+<span class="c1">// y_p_l_n  : y coords of interpolation points, for position spline, left rail, spline at n</span>
+<span class="c1">// z_p_l_n  : z coords of interpolation points, for position spline, left rail, spline at n</span>
+<span class="c1">// x_p_l_n1 : x coords of interpolation points, for position spline, left rail, spline at n + 1</span>
+<span class="c1">// y_p_l_n1 : y coords of interpolation points, for position spline, left rail, spline at n + 1</span>
+<span class="c1">// z_p_l_n1 : z coords of interpolation points, for position spline, left rail, spline at n + 1</span>
+
+<span class="c1">// x_p_r_n  : x coords of interpolation points, for position spline, right rail, spline at n</span>
+<span class="c1">// y_p_r_n  : y coords of interpolation points, for position spline, right rail, spline at n</span>
+<span class="c1">// z_p_r_n  : z coords of interpolation points, for position spline, right rail, spline at n</span>
+<span class="c1">// x_p_r_n1 : x coords of interpolation points, for position spline, right rail, spline at n + 1</span>
+<span class="c1">// y_p_r_n1 : y coords of interpolation points, for position spline, right rail, spline at n + 1</span>
+<span class="c1">// z_p_r_n1 : z coords of interpolation points, for position spline, right rail, spline at n + 1</span>
+
+<span class="c1">// x_v_l_n  : x coords of interpolation points, for velocity spline, left rail, spline at n</span>
+<span class="c1">// y_v_l_n  : y coords of interpolation points, for velocity spline, left rail, spline at n</span>
+<span class="c1">// z_v_l_n  : z coords of interpolation points, for velocity spline, left rail, spline at n</span>
+<span class="c1">// x_v_l_n1 : x coords of interpolation points, for velocity spline, left rail, spline at n + 1</span>
+<span class="c1">// y_v_l_n1 : y coords of interpolation points, for velocity spline, left rail, spline at n + 1</span>
+<span class="c1">// z_v_l_n1 : z coords of interpolation points, for velocity spline, left rail, spline at n + 1</span>
+
+<span class="c1">// x_v_r_n  : x coords of interpolation points, for velocity spline, right rail, spline at n</span>
+<span class="c1">// y_v_r_n  : y coords of interpolation points, for velocity spline, right rail, spline at n</span>
+<span class="c1">// z_v_r_n  : z coords of interpolation points, for velocity spline, right rail, spline at n</span>
+<span class="c1">// x_v_r_n1 : x coords of interpolation points, for velocity spline, right rail, spline at n + 1</span>
+<span class="c1">// y_v_r_n1 : y coords of interpolation points, for velocity spline, right rail, spline at n + 1</span>
+<span class="c1">// z_v_r_n1 : z coords of interpolation points, for velocity spline, right rail, spline at n + 1</span>
+
+<span class="c1">// cp_positions : xyz coords of the contact points (cp one per wheel, thus two per wheelset)</span>
+    <span class="c1">// example for two wheelsets: cp_positions = { x_first_wheelset_left_wheel,</span>
+    <span class="c1">//                                             y_first_wheelset_left_wheel,</span>
+    <span class="c1">//                                             z_first_wheelset_left_wheel,</span>
+    <span class="c1">//                                             x_first_wheelset_right_wheel,</span>
+    <span class="c1">//                                             y_first_wheelset_right_wheel,</span>
+    <span class="c1">//                                             z_first_wheelset_right_wheel,</span>
+    <span class="c1">//                                             x_second_wheelset_left_wheel,</span>
+    <span class="c1">//                                             y_second_wheelset_left_wheel,</span>
+    <span class="c1">//                                             z_second_wheelset_left_wheel,</span>
+    <span class="c1">//                                             x_second_wheelset_right_wheel,</span>
+    <span class="c1">//                                             y_second_wheelset_right_wheel,</span>
+    <span class="c1">//                                             z_second_wheelset_right_wheel }</span>
+<span class="c1">// cp_velocities : xyz velocity components of the contact points</span>
+    <span class="c1">// example for two wheelsets: cp_velocities = &quot;see cp_positions&quot;</span>
+<span class="c1">// cp_forces : xyz force components at the contact points</span>
+    <span class="c1">// example for two wheelsets: cp_forces = &quot;see cp_positions&quot;</span>
+<span class="c1">// vehicle_accelerations: see &quot;explanation_new outputs.pdf&quot;</span>
+<span class="c1">// bogie_accelerations: see &quot;explanation_new outputs.pdf&quot;</span>
+<span class="c1">// bogie_yaws: see &quot;explanation_new outputs.pdf&quot;</span>
+
+<span class="cp">#endif </span><span class="c1">// VEHICLE_H_INCLUDED</span>
+</pre></div>
+</div>
+</div>
+<p>The XML file, which contains the vehicle system’s definition, is located at the folder <em>dev\api_vehicle\vehicle_xmls</em>. The file <em>veh_0.xml</em> should be provided for analysis. The XML file format is in line with the input of commercial software “MotionSolve”.  The included file refers to a 5-car train with the following properties. The selected properties are summarized in Table (<strong>Units  [kgr, N, m, sec]</strong>).</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 26%" />
+<col style="width: 8%" />
+<col style="width: 28%" />
+<col style="width: 7%" />
+<col style="width: 26%" />
+<col style="width: 5%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head" colspan="6"><p>Mass   Properties</p></th>
+</tr>
+<tr class="row-even"><th class="head"></th>
+<th class="head"></th>
+<th class="head"></th>
+<th class="head"></th>
+<th class="head"></th>
+<th class="head"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-odd"><td><p>Carbody mass</p></td>
+<td><p>41750</p></td>
+<td><p>Bogie mass</p></td>
+<td><p>3040</p></td>
+<td><p>Wheelset mass</p></td>
+<td><p>1780</p></td>
+</tr>
+<tr class="row-even"><td><p>Carbody roll moment of inertia</p></td>
+<td><p>23200</p></td>
+<td><p>Bogie roll moment of inertia</p></td>
+<td><p>1580</p></td>
+<td><p>Wheelset roll moment of inertia</p></td>
+<td><p>1140</p></td>
+</tr>
+<tr class="row-odd"><td><p>Carbody yaw moment of inertia</p></td>
+<td><p>2100000</p></td>
+<td><p>Bogie yaw moment of inertia</p></td>
+<td><p>2340</p></td>
+<td><p>Wheelset yaw moment of inertia</p></td>
+<td><p>1140</p></td>
+</tr>
+<tr class="row-even"><td><p>Carbody pitch moment of inertia</p></td>
+<td><p>2080000</p></td>
+<td><p>Bogie pitch moment of inertia</p></td>
+<td><p>3920</p></td>
+<td><p>Wheelset pitch moment of inertia</p></td>
+<td><p>154</p></td>
+</tr>
+</tbody>
+</table>
+<div class="line-block">
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 34%" />
+<col style="width: 14%" />
+<col style="width: 36%" />
+<col style="width: 17%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head" colspan="2"><p>Stiffness   Properties</p></th>
+<th class="head" colspan="2"><p>Damping   Properties</p></th>
+</tr>
+<tr class="row-even"><th class="head"></th>
+<th class="head"></th>
+<th class="head"></th>
+<th class="head"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-odd"><td><p>Primary vertical</p></td>
+<td><p>950000</p></td>
+<td><p>Primary vertical</p></td>
+<td><p>950000</p></td>
+</tr>
+<tr class="row-even"><td><p>Primary lateral</p></td>
+<td><p>20000</p></td>
+<td><p>Primary lateral</p></td>
+<td><p>20000</p></td>
+</tr>
+<tr class="row-odd"><td><p>Secondary  vertical</p></td>
+<td><p>350000</p></td>
+<td><p>Secondary  vertical</p></td>
+<td><p>350000</p></td>
+</tr>
+<tr class="row-even"><td><p>Secondary  lateral</p></td>
+<td><p>210000</p></td>
+<td><p>Secondary  lateral</p></td>
+<td><p>210000</p></td>
+</tr>
+</tbody>
+</table>
+<p>The vehicle dll file is called through <em>Vehicle_dll.py</em>. The main class is the <em>FixedVehicleDll</em> and is called from the orchestrator. The orchestrator pass all the relevant data that are required as described in <em>vehicleAPI</em></p>
+<div class="literal-block-wrapper docutils container" id="vehicle-dll">
+<div class="code-block-caption"><span class="caption-text"><strong>vehicle_dll</strong></span><a class="headerlink" href="#vehicle-dll" title="Permalink to this code">¶</a></div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">FixedVehicleDll</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dllDir</span><span class="p">,</span> <span class="n">cosim_converge</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">first_time</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="k">def</span> <span class="nf">solve</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+      </div>
+      <div class="bottomnav" role="navigation" aria-label="bottom navigation">
+      
+        <p>
+        «&#160;&#160;<a href="general.html">General</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="index.html">Contents</a>
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2021, RAIL-EQ.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
+    </div>
+  </body>
+</html>
