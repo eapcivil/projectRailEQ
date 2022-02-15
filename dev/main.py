@@ -2,7 +2,7 @@ import subprocess
 import time
 import os
 import signal
-import psutil
+#import psutil
 import gc
 
 #  i - length of set of parameters

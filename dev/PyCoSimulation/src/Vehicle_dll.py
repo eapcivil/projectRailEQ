@@ -311,7 +311,7 @@ class FixedVehicleDll(object):
 
 def VehicleFIXEDTEST():
     p1 = Path(__file__).parents[2]
-    dllDir = "{}".format(p1) + "\\Vehicle_dll_3\\Debug\\vehicle.dll"
+    dllDir = "{}".format(p1) + "\\api_vehicle\\Release\\vehicle.dll"
     cosim_converge = False
     first_time = True
     t0 = 0.0

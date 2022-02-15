@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import openseespy.opensees as ops
-import openseespy.postprocessing.Get_Rendering as opsplt
+#import openseespy.postprocessing.Get_Rendering as opsplt
 from force_transform import nodalForces
 from utilities import bcolors
 
@@ -36,8 +36,8 @@ def relativeAccel(ry, rz, rotation):
 
 class Bridge(object):
 
-    def __init__(self, Ec, gap, stiffnessFactor, phiybz, Mybz, phiubz, Mubz, phiyby, Myby, phiuby, Μυby, dt, globalT,
-                 eqTime, eqValues, eqDirection):
+    def __init__(self, Ec, gap, stiffnessFactor, phiybz, Mybz, phiubz, Mubz, phiyby, Myby, phiuby, Μuby, dt, globalT,
+                 eqTime, eqValues, eqTime_vertical, eqValues_vertical, eqDirection):
         self.deckNodeID = [1, 13, 28, 29, 30, 31, 32, 33, 34, 35, 36, 14, 15, 2, 16, 17, 37, 38, 39, 40, 41, 42, 43, 44,
                            45, 18, 19, 3, 20, 21, 46, 47, 48, 49, 50, 51, 52, 53, 54, 22, 23, 4, 24, 25, 55, 56, 57, 58,
                            59, 60, 61,
@@ -53,6 +53,8 @@ class Bridge(object):
         self.globalT = globalT
         self.eqTime = eqTime
         self.eqValues = eqValues
+        self.eqTime_vertical = eqTime_vertical
+        self.eqValues_vertical = eqValues_vertical
         self.eqDirection = eqDirection
 
         self.Ec = Ec
@@ -65,7 +67,7 @@ class Bridge(object):
         self.phiyby = phiyby
         self.Myby = Myby
         self.phiuby = phiuby
-        self.Muby = Μυby
+        self.Muby = Μuby
 
     def initialize_model(self):
         ops.wipe()
@@ -1242,7 +1244,7 @@ class Bridge(object):
         ops.numberer('RCM')
         ops.constraints('Plain')
         ops.system('UmfPack')
-        ops.test('RelativeNormDispIncr', 0.001, 500, 2)
+        ops.test('RelativeNormDispIncr', 0.01, 100, 2)
         ops.algorithm('Newton')
         NstepGravity = 5
         DGravity = 1. / NstepGravity
@@ -1253,7 +1255,6 @@ class Bridge(object):
         ops.save(0)
 
     def solve_transient(self):
-        ops.wipeAnalysis()
         ops.wipeAnalysis()
         ops.remove('sp', 160, self.eqDirection)
         ops.remove('sp', 166, self.eqDirection)
@@ -1266,6 +1267,20 @@ class Bridge(object):
         ops.remove('sp', 90, self.eqDirection)
         ops.remove('sp', 100, self.eqDirection)
         ops.remove('sp', 110, self.eqDirection)
+
+        # Vertical
+        ops.remove('sp', 160, 3)
+        ops.remove('sp', 166, 3)
+        ops.remove('sp', 1560, 3)
+        ops.remove('sp', 1620, 3)
+        ops.remove('sp', 182000, 3)
+        ops.remove('sp', 183000, 3)
+        ops.remove('sp', 184000, 3)
+        ops.remove('sp', 185000, 3)
+        ops.remove('sp', 90, 3)
+        ops.remove('sp', 100, 3)
+        ops.remove('sp', 110, 3)
+
         a0 = 0.0  # 0.2282461
         a1 = 0.01091939  #0.0
         ops.rayleigh(a0, 0.0, a1, 0.0)
@@ -1278,8 +1293,24 @@ class Bridge(object):
         ops.analysis('Transient')
 
         ops.timeSeries('Path', 10, '-values', *self.eqValues, '-time', *self.eqTime, '-predendZero')
-        ops.pattern('MultipleSupport', 21313)
+        ops.pattern('MultipleSupport', 21313)  # 
         ops.groundMotion(1, 'Plain', '-accel', 10, 'Trapezoidal', '-fact', 9.81)
+        # vertical Ground Motion
+        ops.timeSeries('Path', 11, '-values', *self.eqValues_vertical, '-time', *self.eqTime_vertical, '-predendZero')
+        ops.groundMotion(2, 'Plain', '-accel', 11, 'Trapezoidal', '-fact', 9.81)
+        ops.imposedMotion(160, 3, 2)
+        ops.imposedMotion(166, 3, 2)
+        ops.imposedMotion(1560, 3, 2)
+        ops.imposedMotion(1620, 3, 2)
+        ops.imposedMotion(182000, 3, 2)
+        ops.imposedMotion(183000, 3, 2)
+        ops.imposedMotion(184000, 3, 2)
+        ops.imposedMotion(185000, 3, 2)
+        ops.imposedMotion(90, 3, 2)
+        ops.imposedMotion(100, 3, 2)
+        ops.imposedMotion(110, 3, 2)
+
+
         ops.imposedMotion(160, self.eqDirection, 1)
         ops.imposedMotion(166, self.eqDirection, 1)
         ops.imposedMotion(1560, self.eqDirection, 1)

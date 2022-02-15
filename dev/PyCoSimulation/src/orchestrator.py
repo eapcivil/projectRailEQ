@@ -13,9 +13,9 @@ from _ctypes import FreeLibrary as FreeLibrary
 
 
 class Orch(object):
-    def __init__(self, dllDir, xmlDir,spline_extension, CosimSteps, bridgeLenght, eqTime, eqValues, irregularityX,
+    def __init__(self, dllDir, xmlDir,spline_extension, CosimSteps, bridgeLenght, eqTime, eqValues, eqTime_vertical, eqValues_vertical, irregularityX,
                  irregularityY, Ec,
-                 gap, stiffnessFactor, phiybz, Mybz, phiubz, Mubz, phiyby, Myby, phiuby, Μυby, eqStartTime,
+                 gap, stiffnessFactor, phiybz, Mybz, phiubz, Mubz, phiyby, Myby, phiuby, Muby, eqStartTime,
                  eqDirection, vehicle_speed):
 
         self.dllDir = dllDir
@@ -26,6 +26,8 @@ class Orch(object):
         self.bridgeLength = bridgeLenght
         self.eqTime = eqTime
         self.eqValues = eqValues
+        self.eqTime_vertical = eqTime_vertical
+        self.eqValues_vertical = eqValues_vertical
         self.irregularityX = irregularityX
         self.irregularityY = irregularityY
         self.eqStartTime = eqStartTime
@@ -42,7 +44,7 @@ class Orch(object):
         self.phiyby = phiyby
         self.Myby = Myby
         self.phiuby = phiuby
-        self.Muby = Μυby
+        self.Muby = Muby
 
         self.x_ext = []
         for i in range(self.num_of_spline_extension):
@@ -196,17 +198,20 @@ class Orch(object):
                     bridge = Bridge(self.Ec, self.gap, self.stiffnessFactor, self.phiybz, self.Mybz, self.phiubz,
                                       self.Muby, self.phiyby, self.Myby,
                                       self.phiuby, self.Muby,
-                                      self.dtBridge, self.globalTime, self.eqTime, self.eqValues, self.eqDirection)
+                                      self.dtBridge, self.globalTime, self.eqTime, self.eqValues, self.eqTime_vertical, self.eqValues_vertical, self.eqDirection)
                     bridge.initialize_model()
                     bridge.construct_model()
                     if bridgeTag == 0:
                         bridge.solve_gravity()
                         bridgeTag = 1
                     bridge.restore()
+                    print("gravity solved")
                     bridge.add_nodalLoad(0, cp_positions, cp_velocities, cp_forces,bridgeSubSteps)
                     bridge.add_nodalLoad(1, cp_positions1, cp_velocities1, cp_forces1,bridgeSubSteps)
                     x_p_l_n, y_p_l_n, z_p_l_n_woIr, x_p_l_n1, y_p_l_n1, z_p_l_n1_woIr, x_p_r_n, y_p_r_n, z_p_r_n_woIr, x_p_r_n1, y_p_r_n1, z_p_r_n1_woIr, \
                     xx_v_l_n, yy_v_l_n, zz_v_l_n, xx_v_l_n1, yy_v_l_n1, zz_v_l_n1, xx_v_r_n, yy_v_r_n, zz_v_r_n, xx_v_r_n1, yy_v_r_n1, zz_v_r_n1, verticalAccel, r2return = bridge.solve_transient()
+
+                    print("transient Solved")
                     # only for explicit------------
                     cp_positions = cp_positions1
                     cp_velocities = cp_velocities1
@@ -342,6 +347,7 @@ class Orch(object):
                                                   x_v_r_n1, y_v_r_n1, z_v_r_n1, ncp)
                         cosim_converge = False
                         cp_positions10, cp_velocities10, cp_forces10, vehicle_accelerations, bogie_accelerations, bogie_yaws = vehicle.solve()
+                        print("vehicle solved")
                         cp_forces10 = [values / 1000.0 for i,
                                                            values in enumerate(cp_forces10)]
                         del vehicle
@@ -423,6 +429,7 @@ def multiple_analysis(argv):
     PyCosimPath = srcFolderPath.parent.absolute()
     ApiPath=orchPath.parent.parent.parent
     eqPath = os.path.join(projectPath, "Earthquakes")
+    eqPath_vertical = os.path.join(projectPath, "Earthquakes_vertical")
     dllDir = os.path.join(ApiPath, "api_vehicle\\Release\\vehicle.dll")
     xmlDir = os.path.join(ApiPath, "api_vehicle\\vehicle_xmls")
 
@@ -475,45 +482,55 @@ def multiple_analysis(argv):
 
     for indx, folderName in enumerate(eqFolderName):
         eqFiles = os.path.join(eqPath, str(folderName))
-        case_indx = 0
-        for files in os.listdir(eqFiles):
-            case_indx += 1
-            fileName = os.path.join(eqFiles, files)
-            eqStartTime = 0  # eqStartTime = createEQstartsV2(fileName)
-            eqTime, eqValues = LoadRecordTimeandValues(fileName)
-            # CosimSteps = int(eqTime[-1] / 0.2)
-            spline_extension = getSplineExtension(
-                vehicleSpeed, eqTime, eqValues) + vehicleLength + 20
-            orch = Orch(dllDir, xmlDir,spline_extension, CosimSteps, bridgeLength, eqTime, eqValues, irregularityX,
-                        irregularityY,
-                        Ec[indx],
-                        gap[indx], stiffnessFactor[indx], phiybz[indx], Mybz[indx], phiubz[indx], Mubz[indx],
-                        phiyby[indx], Myby[indx], phiuby[indx], Muby[indx], eqStartTime, eqDirection, vehicleSpeed)
-            orch.time()
-            vehicleAccel = []
-            bogieAccel = []
-            pierTopsDict, pierBaseDict, bearingTop, bearingBase, abutmntX, abutmntY, forces, vehicleAccelerations, bogieAccelerations, verticalAccelControlPoints, r = orch.solution()
-            forceZonly = []
-            for i in forces:
-                for j in range(2, len(i), 3):
-                    forceZonly.append(i[j])
-            for i in range(len(vehicleAccelerations)):
-                for j in range(len(vehicleAccelerations[i])):
-                    vehicleAccel.append(vehicleAccelerations[i][j])
-            for i in range(len(bogieAccelerations)):
-                for j in range(len(bogieAccelerations[i])):
-                    bogieAccel.append(bogieAccelerations[i][j])
-            saveOutputFile = os.path.join(
-                resultDirPerDirection, "line" + str(indx) + '_' + files)
-            saveOutputFile_extra = os.path.join(
-                resultDirPerDirection, "extra_line" + str(indx) + '_' + files)
-            writeOutputsT4wForces(saveOutputFile, pierTopsDict, pierBaseDict, bearingTop, bearingBase, abutmntX,
-                                  abutmntY, forceZonly, vehicleAccel, bogieAccel,
-                                  int(eqDirection))
-            writeExtraOutputsT45wForces(saveOutputFile_extra, verticalAccelControlPoints, r)
-            del orch
-            if os.path.exists(os.path.join(PyCosimPath, "OpenSees_DB")):
-                shutil.rmtree(os.path.join(PyCosimPath, "OpenSees_DB"))
+        eqFiles_vertical = os.path.join(eqPath_vertical, str(folderName))
+        if (indx==int(argv[1])):
+            case_run = int(argv[2])
+            case_indx=0
+            for files in os.listdir(eqFiles):
+                if not(case_indx==case_run):
+                    case_indx+=1
+                    continue
+                else:
+                    case_indx += 1
+                    pass
+                fileName = os.path.join(eqFiles, files)
+                fileName_vertical = os.path.join(eqFiles_vertical, files[:-4]+".txt")
+                eqStartTime = 0  # eqStartTime = createEQstartsV2(fileName)
+                eqTime, eqValues = LoadRecordTimeandValues(fileName)
+                eqTime_vertical, eqValues_vertical = LoadRecordTimeandValues(fileName_vertical)
+                # CosimSteps = int(eqTime[-1] / 0.2)
+                spline_extension = getSplineExtension(
+                    vehicleSpeed, eqTime, eqValues) + vehicleLength + 20
+                orch = Orch(dllDir, xmlDir,spline_extension, CosimSteps, bridgeLength, eqTime, eqValues, eqTime_vertical, eqValues_vertical, irregularityX,
+                            irregularityY,
+                            Ec[indx],
+                            gap[indx], stiffnessFactor[indx], phiybz[indx], Mybz[indx], phiubz[indx], Mubz[indx],
+                            phiyby[indx], Myby[indx], phiuby[indx], Muby[indx], eqStartTime, int(eqDirection), vehicleSpeed)
+                orch.time()
+                vehicleAccel = []
+                bogieAccel = []
+                pierTopsDict, pierBaseDict, bearingTop, bearingBase, abutmntX, abutmntY, forces, vehicleAccelerations, bogieAccelerations, verticalAccelControlPoints, r = orch.solution()
+                forceZonly = []
+                for i in forces:
+                    for j in range(2, len(i), 3):
+                        forceZonly.append(i[j])
+                for i in range(len(vehicleAccelerations)):
+                    for j in range(len(vehicleAccelerations[i])):
+                        vehicleAccel.append(vehicleAccelerations[i][j])
+                for i in range(len(bogieAccelerations)):
+                    for j in range(len(bogieAccelerations[i])):
+                        bogieAccel.append(bogieAccelerations[i][j])
+                saveOutputFile = os.path.join(
+                    resultDirPerDirection, "line" + str(indx) + '_' + files)
+                saveOutputFile_extra = os.path.join(
+                    resultDirPerDirection, "extra_line" + str(indx) + '_' + files)
+                writeOutputsT4wForces(saveOutputFile, pierTopsDict, pierBaseDict, bearingTop, bearingBase, abutmntX,
+                                      abutmntY, forceZonly, vehicleAccel, bogieAccel,
+                                      int(eqDirection))
+                writeExtraOutputsT45wForces(saveOutputFile_extra, verticalAccelControlPoints, r)
+                del orch
+                if os.path.exists(os.path.join(PyCosimPath, "OpenSees_DB")):
+                    shutil.rmtree(os.path.join(PyCosimPath, "OpenSees_DB"))
 
 
 if __name__ == "__main__":
